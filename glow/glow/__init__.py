@@ -10,22 +10,30 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError
 import requests
 
-from . import helpers, messages
+from . import messages
 
 
 class Glow(object):
 
-    current_directory = None
-    git_directory = None
-    version_file = None
     repo = None
+    config = None
+
+    current_directory = None
+    working_directory = None
+    git_directory = None
+
+    version_file = None
 
     workspace = None
     version = None
     branches = None
 
-    glow_file = None
     glow_config = None
+
+    jira_project_key = None
+    github_url = None
+    github_repository_name = None
+    github_token = None
 
     @staticmethod
     def _change_branch(branch_name):
@@ -157,8 +165,13 @@ class Glow(object):
         #     return False
         # else:
         #     return "".join(
-        #         ["- " + line + "\n" for line in output.stdout.text.split("\n")]
+        #         [
+        #         "- " + line + "\n" for line in output.stdout.text.split("\n")
+        #         ]
         #     )
+
+    def _branches(self):
+        return [branch.name for branch in self.repo.branches]
 
     def _str_version(self, version=None):
         """Cast version dict to string"""
@@ -229,13 +242,17 @@ class Glow(object):
 
     def _feature_exists(self, issue_id):
         issue_id = str(issue_id)
-        feature_name = "feature/{}-{}_".format(
+        feature_name = "feature/{}-{}".format(
             self.glow_config.get("jira", "project_key"), issue_id
         )
-        for branch in self._branches:
-            if feature_name in branch:
-                return True
-        return False
+
+        messages.log("---")
+        messages.success(repr(self.repo.branches))
+        messages.log("---")
+        messages.success(repr(self._branches()))
+        messages.log("---")
+
+        return feature_name in self._branches()
 
     def _get_feature_branch(self, issue_id):
         issue_id = str(issue_id)
@@ -251,120 +268,71 @@ class Glow(object):
     #             return branch
     #     return None
 
-    def __init__(self):
-        """Initialize Github Flow CLI"""
+    def _create_config(self):
+        self.jira_project_key = messages.question("Jira Project Key? ").upper()
+        self.github_url = messages.question("Github URL? ").lower()
+        self.github_repository_name = messages.question(
+            "Github Repository Name? [:owner/:name] "
+        )
+        self.github_token = messages.question("Github Token? ")
 
-        # Initialize Colorama
-        colorama.init(autoreset=True)
+        self.glow_config = {
+            "github": {
+                "url": self.github_url,
+                "token": self.github_token,
+                "repository": self.github_repository_name,
+            },
+            "jira": {"project_key": self.jira_project_key},
+        }
 
+    def _init_repo(self):
         self.current_directory = os.getcwd()
 
         try:
-            self.repo = Repo(self.current_directory)
-
-            messages.log("Current directory: {}".format(self.current_directory))
+            self.repo = Repo(
+                self.current_directory, search_parent_directories=True
+            )
+            _ = self.repo.git.rev_parse("--show-toplevel")
+            self.working_directory = self.repo.working_dir
+            self.git_directory = self.repo.git_dir
 
         except InvalidGitRepositoryError:
             messages.critical("You are not in a git repository")
             sys.exit(errno.ENOENT)
 
-        self.git_directory = self.repo.git_dir
-        self.working_dir = self.repo.working_dir
-        self.working_tree_dir = self.repo.working_tree_dir
-        self.index = self.repo.index
+    def _init_glow(self):
+        glow_file = "{}/glow.json".format(self.working_directory)
 
-        messages.log(dir(self.repo))
-        messages.info("Working Dir: {}".format(self.working_dir))
-        messages.info("Working Tree Dir: {}".format(self.working_tree_dir))
-        messages.info("Index: {}".format(self.index))
-        messages.info("Tree: {}".format(self.repo.tree))
+        if os.path.exists(glow_file):
+            with open(glow_file) as file_resource:
+                self.glow_config = json.load(file_resource)
 
-        if not self.working_tree_dir:
-            messages.critical("You are not in a git repository")
-            sys.exit(errno.ENOENT)
+        else:
+            create_a_glow_file = messages.question("Create a glow file? [Y/n] ")
 
-        messages.info("Workspace: {}".format(self.working_tree_dir))
+            if create_a_glow_file.lower() != "y":
+                messages.warning(
+                    "Command can't be used without configuration file"
+                )
+                sys.exit(errno.EPERM)
 
-        # Retrieve Workspace
+            else:
+                self._create_config()
+                with open(glow_file, "w") as file_resource:
+                    json.dump(self.glow_config, file_resource)
 
-        # output = sarge.run(
-        #     "git rev-parse --show-toplevel",
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 1:
-        #     messages.critical("Not in a git repository")
-        #     sys.exit(errno.ENOENT)
-        #
-        # else:
-        #     self.workspace = helpers.remove_new_line(output.stdout.text)
-        #     messages.info("Workspace: {}".format(self.workspace))
-        #
-        # Retrieve application version
-        # messages.log("Retrieve application version...")
-        # self.version_file = os.path.join(self.workspace, "version")
-        #
-        # if not self._get_version():
-        #     create_a_version_file = messages.question(
-        #         "Create a Version file? [y/n] "
-        #     )
-        #
-        #     if create_a_version_file.lower() != "y":
-        #         messages.warning("Quitting...")
-        #         sys.exit(errno.EPERM)
-        #
-        #     version = {"master": 0, "release": 0, "hotfix": 0}
-        #     self._set_version(version)
-        #
-        #     messages.success("Version file created.")
-        #
-        # messages.info(
-        #     "Current application version: {}".format(self._str_version())
-        # )
+    def __init__(self):
+        """Initialize Github Flow CLI"""
 
-        # Retrieve glow file
-        # messages.log("Retrieve glow configuration...")
-        # messages.info()
-        # self.glow_file = os.path.join(self.workspace, ".glow")
-        #
-        # if not self._get_glow_configuration():
-        #     create_a_glow_file = messages.question(
-        #         "Create a FlowHub file? [y/n] "
-        #     )
-        #
-        #     if create_a_glow_file.lower() != "y":
-        #         messages.warning("Quitting...")
-        #         sys.exit(errno.EPERM)
-        #
-        #     self.glow_config = configparser.ConfigParser()
-        #
-        #     self.glow_config.add_section("github")
-        #     github_url = messages.question("Github URL? ")
-        #     self.glow_config.set("github", "url", github_url)
-        #
-        #     github_token = messages.question("Github Token? ")
-        #     self.glow_config.set("github", "token", github_token)
-        #
-        #     github_repository_name = messages.question(
-        #         "Github Repository Name? [:owner/:name] "
-        #     )
-        #     self.glow_config.set(
-        #         "github", "repository_name", github_repository_name
-        #     )
-        #
-        #     self.glow_config.add_section("jira")
-        #     jira_project_key = messages.question("Jira Project Key? ")
-        #     self.glow_config.set("jira", "project_key", jira_project_key)
-        #
-        #     with open(self.glow_file, "wb") as file_resource:
-        #         self.glow_config.write(file_resource)
-        #
-        #     messages.success("FlowHub file created.")
-        #
-        # Retrieve available branches
-        # messages.log("Retrieve available branches...")
-        # self._get_branches()
+        colorama.init(autoreset=True)
+
+        self._init_repo()
+
+        messages.info("Working Directory: {}".format(self.working_directory))
+        messages.info("Git Directory: {}".format(self.git_directory))
+        messages.info("Current Directory: {}".format(self.current_directory))
+
+        self._init_glow()
 
     """
         Feature methods
@@ -373,7 +341,7 @@ class Glow(object):
         - cancel
     """
 
-    def start_feature(self, issue_id, description):
+    def start_feature(self, issue_id):
         try:
             issue_id = int(issue_id)
 
@@ -385,13 +353,7 @@ class Glow(object):
             messages.critical("IssueID is not set.")
             sys.exit(1)
 
-        if not description or not len(description):
-            messages.critical('description can"t be empty.')
-            sys.exit(1)
-
-        feature_name = "{}-{}_{}".format(
-            self.glow_config.get("jira", "project_key"), issue_id, description
-        )
+        feature_name = "{}-{}".format(self.jira_project_key, issue_id)
 
         if self._feature_exists(issue_id):
             messages.error(
@@ -1144,7 +1106,7 @@ class Glow(object):
         _func = getattr(self, method_name)
 
         if "feature" in method_name:
-            _func(args.key, "-".join(args.extras).lower())
+            _func(args.key)
         elif "release" in method_name:
             _func(args.master)
         else:
