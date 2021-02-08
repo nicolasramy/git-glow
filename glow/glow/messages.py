@@ -22,7 +22,7 @@ def error(message):
 
 
 def critical(message):
-    print(colored(message, "white", "on_red"))
+    print(colored(message, "grey", "on_red"))
 
 
 def question(message):
