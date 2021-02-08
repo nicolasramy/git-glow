@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 from termcolor import colored
 
 
@@ -29,4 +26,4 @@ def critical(message):
 
 
 def question(message):
-    return raw_input(colored(message, "cyan", attrs=["bold"]))
+    return input(colored(message, "cyan", attrs=["bold"]))

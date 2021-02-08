@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import sys
 
-import messages
+from . import messages
 
 
 def remove_new_line(stdout):
@@ -18,7 +17,7 @@ def validate_issue_id(issue_id):
         sys.exit(1)
 
     except TypeError:
-        messages.critical('IssueID is not set.')
+        messages.critical("IssueID is not set.")
         sys.exit(1)
 
     return issue_id

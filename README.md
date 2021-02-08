@@ -4,13 +4,16 @@ A new git extension to use git flow branching model automatically on Github
 ## Requirements
 
 - git
-- Python 2.7+ (not tested on Python 3.5+)
+- Python 3.7+
 
-In a git repository with a **develop** and **master** branch.
+In a git repository with a **develop** and **main** branch.
 
-More ingformation about [gitflow](http://nvie.com/posts/a-successful-git-branching-model/). 
+More information about [gitflow](http://nvie.com/posts/a-successful-git-branching-model/). 
 
 ## How to setup
+```
+docker build --force-rm --pull -t git-glow .
+```
 
 ### Generate a Github token
 
@@ -25,7 +28,11 @@ More ingformation about [gitflow](http://nvie.com/posts/a-successful-git-branchi
 
 If you want to use it on the entire system, prefix this command with sudo
 
-```python setup.py install```
+```
+python setup.py install
+# OR
+docker run -it --rm -v $PWD:/app -v $HOME/Workspace:/workspace glow:0.1.0
+```
 
 ## Usage
 
@@ -61,7 +68,7 @@ git glow start release
 
 #### Review a release
 
-To generate a Pull Request in order to merge your **release** into **master** branch.
+To generate a Pull Request in order to merge your **release** into **main** branch.
 
 ```bash
 git glow review release
@@ -81,7 +88,7 @@ git glow finish release
 
 #### Start a new hotfix
 
-To create a hotfix from the last release merged on the **master** branch.
+To create a hotfix from the last release merged on the **main** branch.
 
 ```bash
 git glow start hotfix
@@ -89,7 +96,7 @@ git glow start hotfix
 
 #### Review a hotfix
 
-To generate a Pull Request in order to merge your **hotfix** into **master** branch.
+To generate a Pull Request in order to merge your **hotfix** into **main** branch.
 
 ```bash
 git glow review hotfix
