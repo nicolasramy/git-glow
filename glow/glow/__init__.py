@@ -38,19 +38,6 @@ class Glow(object):
     github_repository_name = None
     github_token = None
 
-    @staticmethod
-    def _change_branch(branch_name):
-        ...
-        # output = sarge.run(
-        #     "git checkout {}".format(branch_name),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.error('Branch "{}" not found.'.format(branch_name))
-        #     return False
-
     def _pull_branch(self, branch_name, create_branch=False):
         if create_branch:
             self.repo.git.pull("origin")
@@ -135,45 +122,6 @@ class Glow(object):
 
     def _branches(self):
         return [branch.name for branch in self.repo.branches]
-
-    def _str_version(self, version=None):
-        """Cast version dict to string"""
-        if not version:
-            version = self.version
-        return "{}.{}.{}".format(
-            version["master"], version["release"], version["hotfix"]
-        )
-
-    def _get_version(self):
-        """Read application version from file"""
-        if os.path.exists(self.version_file):
-            version = open(self.version_file, "r").read()
-            master, release, hotfix = version.split(".")
-            self.version = {
-                "master": int(master),
-                "release": int(release),
-                "hotfix": int(hotfix),
-            }
-            return self.version
-
-        else:
-            return False
-
-    def _set_version(self, version=None):
-        """Write application version to file"""
-        if not version:
-            version = self.version
-
-        else:
-            self.version = version
-
-        try:
-            open(self.version_file, "w").write(self._str_version(version))
-            return True
-
-        except Exception as error:
-            messages.critical(error)
-            return False
 
     def _feature_exists(self, issue_id):
         issue_id = str(issue_id)
@@ -819,7 +767,6 @@ class Glow(object):
                 )
 
                 # with sarge.Capture() as output:
-                #     self._set_version()
                 #     sarge.run(
                 #         "git add version &&"
                 #         'git commit -m "Update version to {}" &&'
