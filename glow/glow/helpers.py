@@ -3,21 +3,14 @@ import sys
 from . import messages
 
 
-def remove_new_line(stdout):
-    """Remove new line from input data"""
-    return stdout.replace("\n", "")
+def parse_args():
+    parser = argparse.ArgumentParser(
+            description="Glow your workflow"
+        )
+        parser.add_argument("action")
+        parser.add_argument("entity")
+        parser.add_argument("key", nargs="*", default=None)
 
-
-def validate_issue_id(issue_id):
-    try:
-        issue_id = int(issue_id)
-
-    except ValueError:
-        messages.critical('IssueID "{}" is not valid.'.format(issue_id))
-        sys.exit(1)
-
-    except TypeError:
-        messages.critical("IssueID is not set.")
-        sys.exit(1)
-
-    return issue_id
+        args = parser.parse_args()
+        
+    return args

@@ -17,7 +17,7 @@ class Glow(object):
 
     GITHUB_API_URL = "https://api.github.com"
 
-    version = "0.0.0"
+    version = None
 
     repo = None
     config = None
@@ -25,11 +25,6 @@ class Glow(object):
     current_directory = None
     working_directory = None
     git_directory = None
-
-    version_file = None
-
-    workspace = None
-    branches = None
 
     glow_config = None
 
@@ -57,68 +52,16 @@ class Glow(object):
         from origin and prune remote branches
         """
         ...
-        # output = sarge.run(
-        #     "git checkout develop && "
-        #     "git pull origin develop && "
-        #     "git checkout master && "
-        #     "git pull origin master && "
-        #     "git fetch --tags && "
-        #     "git remote prune origin",
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.error("An error occurred while pulling the repository.")
-        #
-        # else:
-        #     messages.success("Repository pulled.")
-        #
-        # return not bool(output.returncode)
 
     @staticmethod
     def _push_repository():
         """Push develop and master branches and tags to origin"""
         ...
-        # output = sarge.run(
-        #     "git checkout develop && "
-        #     "git push origin develop && "
-        #     "git checkout master && "
-        #     "git push origin master && "
-        #     "git push origin --tags",
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.error("An error occurred while pushing the repository.")
-        #
-        # else:
-        #     messages.success("Repository pushed.")
-        #
-        # return not bool(output.returncode)
 
     @staticmethod
     def _generate_changelog(branch_from, branch_to):
         """Generate changelog between two branches"""
         ...
-        # output = sarge.run(
-        #     'git log {}..{} --pretty=format:"%s" --date=short'.format(
-        #         branch_from, branch_to
-        #     ),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical("Unable to generate changelog")
-        #     return False
-        # else:
-        #     return "".join(
-        #         [
-        #         "- " + line + "\n" for line in output.stdout.text.split("\n")
-        #         ]
-        #     )
 
     def _branches(self):
         return [branch.name for branch in self.repo.branches]
@@ -506,19 +449,6 @@ class Glow(object):
                         self._str_version()
                     )
                 )
-
-                # with sarge.Capture() as output:
-                #     self._set_version()
-                #     sarge.run(
-                #         "git add version &&"
-                #         'git commit -m "Update version to {}" &&'
-                #         "git push origin release/{}".format(
-                #             self._str_version(), self._str_version()
-                #         ),
-                #         stdout=output,
-                #         stderr=output,
-                #     )
-                # return True
                 ...
 
             else:
@@ -548,140 +478,10 @@ class Glow(object):
             return False
 
     def review_release(self, is_master=False):
-        # output = sarge.run(
-        #     "git checkout release/{}".format(self._str_version()),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.error("No release found")
-        #     return False
-        #
-        # self._push_branch("release/{}".format(self._str_version()))
-        #
-        # Create a Pull Request
-        # session = requests.Session()
-        #
-        # headers = {
-        #     "Authorization": "token {}".format(
-        #         self.glow_config.get("github", "token")
-        #     ),
-        #     "Content-Type": "application/json",
-        # }
-        #
-        # branch_from = "master"
-        # branch_to = "release/{}".format(self._str_version())
-        #
-        # changelog = self._generate_changelog(branch_from, branch_to)
-        #
-        # if not changelog:
-        #     return False
-        #
-        # payload = {
-        #     "title": "Release {}".format(self._str_version()),
-        #     "body": changelog,
-        #     "head": branch_to,
-        #     "base": branch_from,
-        # }
-        #
-        # response = session.post(
-        #     "{}/api/v3/repos/{}/pulls".format(
-        #         self.glow_config.get("github", "url"),
-        #         self.glow_config.get("github", "repository_name"),
-        #     ),
-        #     headers=headers,
-        #     data=json.dumps(payload),
-        # )
-        #
-        # if response.status_code == 201:
-        #     messages.success(
-        #         "New Pull Request created: {}".format(
-        #             response.json()["html_url"]
-        #         )
-        #     )
-        #     return True
-        #
-        # else:
-        #     messages.critical(response.json()["message"])
-        #     for error in response.json()["errors"]:
-        #         messages.error(error["message"])
-        #     return False
         ...
 
     def finish_release(self, is_master=False):
         ...
-        # self._pull_repository()
-        #
-        # output = sarge.run(
-        #     "git show master\\^1",
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical(
-        #         'Unable to find previous commit on "master" branch.'
-        #     )
-        #     return False
-        #
-        # commit_ref = output.stdout.text.split("\n")[0].replace("commit ", "")
-        # changelog = self._generate_changelog(commit_ref, "master")
-        #
-        # if not changelog:
-        #     return False
-        #
-        # messages.info("Tag version {}.".format(self._str_version()))
-        # output = sarge.run(
-        #     'git tag -a {} -m "{}"'.format(
-        #         self._str_version(), changelog.replace('"', '\\"')
-        #     ),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical(
-        #         "Unable to tag version {}.".format(self._str_version())
-        #     )
-        #     return False
-        #
-        # messages.info(
-        #     'Merge tag "{}" into "develop".'.format(self._str_version())
-        # )
-        # merge_message = 'Merge tag "{}" into "develop"\n\n{}'.format(
-        #     self._str_version(), changelog
-        # )
-        # output = sarge.run(
-        #     "git push origin --tags && "
-        #     "git checkout develop && "
-        #     'git merge --no-ff {} -m "{}" -X theirs'.format(
-        #         self._str_version(), merge_message
-        #     ),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical('Unable to merge tag into "develop"')
-        #     return False
-        #
-        # self._push_branch("develop")
-        #
-        # output = sarge.run(
-        #     "git branch -d release/{} &&"
-        #     "git push origin :release/{}".format(
-        #         self._str_version(), self._str_version()
-        #     ),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.warning("Unable to remove release branches.")
-        #     return False
-        #
-        # messages.success("Release {} finished.".format(self._str_version()))
 
     def cancel_release(self, is_master=False):
         messages.warning("Not implemented yet")
@@ -765,17 +565,6 @@ class Glow(object):
                         self._str_version()
                     )
                 )
-
-                # with sarge.Capture() as output:
-                #     sarge.run(
-                #         "git add version &&"
-                #         'git commit -m "Update version to {}" &&'
-                #         "git push origin hotfix/{}".format(
-                #             self._str_version(), self._str_version()
-                #         ),
-                #         stdout=output,
-                #         stderr=output,
-                #     )
                 return True
 
             else:
@@ -805,140 +594,10 @@ class Glow(object):
             return False
 
     def review_hotfix(self):
-        # output = sarge.run(
-        #     "git checkout hotfix/{}".format(self._str_version()),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.error("No hotfix found")
-        #     return False
-        #
-        # self._push_branch("hotfix/{}".format(self._str_version()))
-        #
-        # Create a Pull Request
-        # session = requests.Session()
-        #
-        # headers = {
-        #     "Authorization": "token {}".format(
-        #         self.glow_config.get("github", "token")
-        #     ),
-        #     "Content-Type": "application/json",
-        # }
-        #
-        # branch_from = "master"
-        # branch_to = "hotfix/{}".format(self._str_version())
-        #
-        # changelog = self._generate_changelog(branch_from, branch_to)
-        #
-        # if not changelog:
-        #     return False
-        #
-        # payload = {
-        #     "title": "Hotfix {}".format(self._str_version()),
-        #     "body": changelog,
-        #     "head": branch_to,
-        #     "base": branch_from,
-        # }
-        #
-        # response = session.post(
-        #     "{}/api/v3/repos/{}/pulls".format(
-        #         self.glow_config.get("github", "url"),
-        #         self.glow_config.get("github", "repository_name"),
-        #     ),
-        #     headers=headers,
-        #     data=json.dumps(payload),
-        # )
-        #
-        # if response.status_code == 201:
-        #     messages.success(
-        #         "New Pull Request created: {}".format(
-        #             response.json()["html_url"]
-        #         )
-        #     )
-        #     return True
-        #
-        # else:
-        #     messages.critical(response.json()["message"])
-        #     for error in response.json()["errors"]:
-        #         messages.error(error["message"])
-        #     return False
         ...
 
     def finish_hotfix(self):
-        self._pull_repository()
         ...
-
-        # output = sarge.run(
-        #     "git show master\\^1",
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical(
-        #         'Unable to find previous commit on "master" branch.'
-        #     )
-        #     return False
-        #
-        # commit_ref = output.stdout.text.split("\n")[0].replace("commit ", "")
-        # changelog = self._generate_changelog(commit_ref, "master")
-        #
-        # if not changelog:
-        #     return False
-        #
-        # messages.info("Tag version {}.".format(self._str_version()))
-        # output = sarge.run(
-        #     'git tag -a {} -m "{}"'.format(
-        #         self._str_version(), changelog.replace('"', '\\"')
-        #     ),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical(
-        #         "Unable to tag version {}.".format(self._str_version())
-        #     )
-        #     return False
-        #
-        # messages.info(
-        #     'Merge tag "{}" into "develop".'.format(self._str_version())
-        # )
-        # merge_message = 'Merge tag "{}" into "develop"\n\n{}'.format(
-        #     self._str_version(), changelog
-        # )
-        # output = sarge.run(
-        #     "git push origin --tags && "
-        #     "git checkout develop && "
-        #     'git merge --no-ff {} -m "{}" -X theirs'.format(
-        #         self._str_version(), merge_message
-        #     ),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical('Unable to merge tag into "develop"')
-        #     return False
-        #
-        # self._push_branch("develop")
-        #
-        # output = sarge.run(
-        #     "git branch -d hotfix/{} &&"
-        #     "git push origin :hotfix/{}".format(
-        #         self._str_version(), self._str_version()
-        #     ),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.warning("Unable to remove hotfix branches.")
-        #     return False
-        #
-        # messages.success("Hotfix {} finished.".format(self._str_version()))
 
     def cancel_hotfix(self):
         messages.warning("Not implemented yet")
@@ -947,13 +606,11 @@ class Glow(object):
 
     def main(self):
         parser = argparse.ArgumentParser(
-            description="Github for git-flow helpers"
+            description="Glow your workflow"
         )
         parser.add_argument("action")
         parser.add_argument("entity")
-        parser.add_argument("key", nargs="?", default=None)
-        parser.add_argument("extras", nargs="*", default=None)
-        parser.add_argument("--master", action="store_true")
+        parser.add_argument("key", nargs="*", default=None)
 
         args = parser.parse_args()
 
@@ -966,18 +623,12 @@ class Glow(object):
 
         if method_name not in methods_list:
             messages.error(
-                'Unknown command "{} {}"'.format(args.action, args.entity)
+                "Unknown command «{} {}»".format(args.action, args.entity)
             )
             sys.exit(1)
 
         _func = getattr(self, method_name)
-
-        if "feature" in method_name:
-            _func(args.key)
-        elif "release" in method_name:
-            _func(args.master)
-        else:
-            _func()
+        _func(args.key)
 
 
 if __name__ == "__main__":
