@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="glow",
-    version=open("version").read(),
+    version="0.0.0",
     packages=find_packages(),
     author="Nicolas RAMY",
     author_email="nicolas.ramy@darkelda.com",
