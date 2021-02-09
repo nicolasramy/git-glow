@@ -222,35 +222,11 @@ class Glow(object):
         else:
             return False
 
-    def _get_branches(self):
-        """Get available branches"""
-        ...
-        # output = sarge.run(
-        #     "git branch -a", stdout=sarge.Capture(), stderr=sarge.Capture()
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.critical("Unable to get branches.")
-        #     return False
-        #
-        # self._branches = [
-        #     name.replace("*", "").strip()
-        #     for name in output.stdout.text.split("\n")
-        #     if name != ""
-        # ]
-        # return self._branches
-
     def _feature_exists(self, issue_id):
         issue_id = str(issue_id)
         feature_name = "feature/{}-{}".format(
             self.glow_config.get("jira", "project_key"), issue_id
         )
-
-        messages.log("---")
-        messages.success(repr(self.repo.branches))
-        messages.log("---")
-        messages.success(repr(self._branches()))
-        messages.log("---")
 
         return feature_name in self._branches()
 
@@ -276,15 +252,6 @@ class Glow(object):
         )
         self.github_token = messages.question("Github Token? ")
 
-        self.glow_config = {
-            "github": {
-                "url": self.github_url,
-                "token": self.github_token,
-                "repository": self.github_repository_name,
-            },
-            "jira": {"project_key": self.jira_project_key},
-        }
-
     def _init_repo(self):
         self.current_directory = os.getcwd()
 
@@ -301,25 +268,61 @@ class Glow(object):
             sys.exit(errno.ENOENT)
 
     def _init_glow(self):
-        glow_file = "{}/glow.json".format(self.working_directory)
-
-        if os.path.exists(glow_file):
-            with open(glow_file) as file_resource:
-                self.glow_config = json.load(file_resource)
-
-        else:
-            create_a_glow_file = messages.question("Create a glow file? [Y/n] ")
-
-            if create_a_glow_file.lower() != "y":
-                messages.warning(
-                    "Command can't be used without configuration file"
+        with self.repo.config_reader() as config_reader:
+            if config_reader.has_section("glow"):
+                # fmt: off
+                self.github_url = config_reader.get(
+                    "glow", "github-url"
                 )
-                sys.exit(errno.EPERM)
+                self.github_token = config_reader.get(
+                    "glow", "github-token"
+                )
+                self.github_repository_name = config_reader.get(
+                    "glow", "github-repository-name"
+                )
+                self.jira_project_key = config_reader.get(
+                    "glow", "jira-project-key"
+                )
+                # fmt: on
 
             else:
-                self._create_config()
-                with open(glow_file, "w") as file_resource:
-                    json.dump(self.glow_config, file_resource)
+                create_a_glow_file = messages.question(
+                    "Create a glow config? [Y/n] "
+                )
+
+                if create_a_glow_file.lower() != "y":
+                    messages.warning(
+                        "Command can't be used without configuration"
+                    )
+                    sys.exit(errno.EPERM)
+
+                else:
+                    self._create_config()
+
+                    with self.repo.config_writer() as config_writer:
+                        # fmt: off
+                        config_writer.add_section("glow")
+                        config_writer.set(
+                            "glow",
+                            "github-url",
+                            self.github_url,
+                        )
+                        config_writer.set(
+                            "glow",
+                            "github-token",
+                            self.github_token,
+                        )
+                        config_writer.set(
+                            "glow",
+                            "github-repository-name",
+                            self.github_repository_name,
+                        )
+                        config_writer.set(
+                            "glow",
+                            "jira-project-key",
+                            self.jira_project_key,
+                        )
+                        # fmt: on
 
     def __init__(self):
         """Initialize Github Flow CLI"""
