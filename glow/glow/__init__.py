@@ -1,5 +1,4 @@
 import argparse
-import configparser
 import errno
 import json
 import os
@@ -212,21 +211,9 @@ class Glow(object):
             messages.critical(error)
             return False
 
-    def _get_glow_configuration(self):
-        """Read application glow parameters from file"""
-        if os.path.exists(self.glow_file):
-            self.glow_config = configparser.ConfigParser()
-            self.glow_config.read(self.glow_file)
-            return self.glow_config
-
-        else:
-            return False
-
     def _feature_exists(self, issue_id):
         issue_id = str(issue_id)
-        feature_name = "feature/{}-{}".format(
-            self.glow_config.get("jira", "project_key"), issue_id
-        )
+        feature_name = "feature/{}-{}".format(self.jira_project_key, issue_id)
 
         return feature_name in self._branches()
 
@@ -377,9 +364,7 @@ class Glow(object):
         session = requests.Session()
 
         headers = {
-            "Authorization": "token {}".format(
-                self.glow_config.get("github", "token")
-            ),
+            "Authorization": "token {}".format(self.github_token),
             "Content-Type": "application/json",
         }
 
