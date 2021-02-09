@@ -11,9 +11,6 @@ In a git repository with a **develop** and **main** branch.
 More information about [gitflow](http://nvie.com/posts/a-successful-git-branching-model/). 
 
 ## How to setup
-```
-docker build --force-rm --pull -t git-glow .
-```
 
 ### Generate a Github token
 
@@ -30,8 +27,8 @@ If you want to use it on the entire system, prefix this command with sudo
 
 ```
 python setup.py install
-# OR
-docker run -it --rm -v $PWD:/app -v $HOME/Workspace:/workspace glow:0.1.0
+pip3 install --force-reinstall .
+pip3 install .
 ```
 
 ## Usage
