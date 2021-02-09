@@ -42,7 +42,7 @@ To use this command, just type ```git glow``` in a git repository
 Development of new features starting from the **develop** branch.
 
 ```bash
-git glow start feature 1234 simple description of my issue
+git glow start feature 1234
 ```
 
 #### Review a feature
@@ -117,10 +117,10 @@ git glow finish hotfix
     - [ ] `cancel_release` 
     - [ ] `cancel_feature` 
 - [ ] Better handling for changelog generation and tag
-- [ ] Improve slugify
-- [ ] Secure creation
-    - [ ] feature
-    - [ ] release
-    - [ ] hotfix
+- [x] Improve slugify
+- [x] Secure creation
+    - [x] feature
+    - [x] release
+    - [x] hotfix
 
 
