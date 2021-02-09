@@ -8,11 +8,16 @@ import colorama
 from git import Repo
 from git.exc import InvalidGitRepositoryError
 import requests
+import semver
 
 from . import messages
 
 
 class Glow(object):
+
+    GITHUB_API_URL = "https://api.github.com"
+
+    version = "0.0.0"
 
     repo = None
     config = None
@@ -24,7 +29,6 @@ class Glow(object):
     version_file = None
 
     workspace = None
-    version = None
     branches = None
 
     glow_config = None
@@ -47,60 +51,20 @@ class Glow(object):
         #     messages.error('Branch "{}" not found.'.format(branch_name))
         #     return False
 
-    @staticmethod
-    def _pull_branch(branch_name, create_branch=False):
-        ...
-        # if create_branch:
-        #     output = sarge.run(
-        #         "git pull origin {} &&"
-        #         "git checkout -b {}".format(branch_name, branch_name),
-        #         stdout=sarge.Capture(),
-        #         stderr=sarge.Capture(),
-        #     )
-        # else:
-        #     output = sarge.run(
-        #         "git checkout {} &&"
-        #         "git pull origin {}".format(branch_name, branch_name),
-        #         stdout=sarge.Capture(),
-        #         stderr=sarge.Capture(),
-        #     )
-        #
-        # if output.returncode > 0:
-        #     messages.error(
-        #         'An error occurred while pulling branch "{}".'.format(
-        #             branch_name
-        #         )
-        #     )
-        #
-        # else:
-        #     messages.success('Branch "{}" pulled.'.format(branch_name))
-        #
-        # return not bool(output.returncode)
+    def _pull_branch(self, branch_name, create_branch=False):
+        if create_branch:
+            self.repo.git.pull("origin")
+            self.repo.git.checkout("HEAD", b=branch_name)
+        else:
+            self.repo.git.checkout(branch_name)
+            self.repo.git.pull("origin")
 
-    @staticmethod
-    def _push_branch(branch_name):
-        ...
-        # output = sarge.run(
-        #     "git checkout {} &&"
-        #     "git push origin {}".format(branch_name, branch_name),
-        #     stdout=sarge.Capture(),
-        #     stderr=sarge.Capture(),
-        # )
-        #
-        # if output.returncode > 0:
-        #     messages.error(
-        #         'An error occurred while pushing branch "{}".'.format(
-        #             branch_name
-        #         )
-        #     )
-        #
-        # else:
-        #     messages.success('Branch "{}" pushed'.format(branch_name))
-        #
-        # return not bool(output.returncode)
+        messages.success('Branch "{}" pulled.'.format(branch_name))
 
-    @staticmethod
-    def _pull_repository():
+    def _push_branch(self, branch_name):
+        self.repo.git.push("origin", branch_name)
+
+    def _pull_repository(self):
         """
         Pull develop and main branches and tags
         from origin and prune remote branches
@@ -217,23 +181,8 @@ class Glow(object):
 
         return feature_name in self._branches()
 
-    def _get_feature_branch(self, issue_id):
-        issue_id = str(issue_id)
-        for branch in self._branches:
-            if issue_id in branch and "remotes" not in branch:
-                return branch
-        return None
-
-    # def get_hotfix_branch(self, issue_id):
-    #     issue_id = str(issue_id)
-    #     for branch in self._branches:
-    #         if issue_id in branch and "remotes" not in branch:
-    #             return branch
-    #     return None
-
     def _create_config(self):
         self.jira_project_key = messages.question("Jira Project Key? ").upper()
-        self.github_url = messages.question("Github URL? ").lower()
         self.github_repository_name = messages.question(
             "Github Repository Name? [:owner/:name] "
         )
@@ -258,9 +207,6 @@ class Glow(object):
         with self.repo.config_reader() as config_reader:
             if config_reader.has_section("glow"):
                 # fmt: off
-                self.github_url = config_reader.get(
-                    "glow", "github-url"
-                )
                 self.github_token = config_reader.get(
                     "glow", "github-token"
                 )
@@ -291,11 +237,6 @@ class Glow(object):
                         config_writer.add_section("glow")
                         config_writer.set(
                             "glow",
-                            "github-url",
-                            self.github_url,
-                        )
-                        config_writer.set(
-                            "glow",
                             "github-token",
                             self.github_token,
                         )
@@ -311,6 +252,30 @@ class Glow(object):
                         )
                         # fmt: on
 
+    def _init_version(self):
+        tags = self.repo.tags
+
+        if not tags:
+            self.version = semver.VersionInfo.parse(self.version)
+
+            messages.warning("No version found for this repository...")
+            first_commit = self.repo.git.rev_list("--max-parents=0", "HEAD")
+            messages.warning(
+                "Generate first version «{}» on first commit".format(
+                    self.version
+                )
+            )
+
+            self.repo.create_tag(self.version, ref=first_commit)
+
+            self.repo.git.push("origin", "--tags")
+            messages.success(
+                "Version {} pushed to remote repository".format(self.version)
+            )
+
+        else:
+            messages.log("Latest version: ...")
+
     def __init__(self):
         """Initialize Github Flow CLI"""
 
@@ -323,13 +288,9 @@ class Glow(object):
         messages.info("Current Directory: {}".format(self.current_directory))
 
         self._init_glow()
+        self._init_version()
 
-    """
-        Feature methods
-        - start
-        - finish
-        - cancel
-    """
+    """ Feature methods """
 
     def start_feature(self, issue_id):
         try:
@@ -369,24 +330,24 @@ class Glow(object):
         }
 
         response = session.get(
-            "{}/api/v3/repos/{}/git/refs/heads".format(
-                self.glow_config.get("github", "url"),
-                self.glow_config.get("github", "repository_name"),
+            "{}/repos/{}/branches/develop".format(
+                self.GITHUB_API_URL,
+                self.github_repository_name,
             ),
             headers=headers,
         )
 
         if response.status_code != 200:
-            messages.critical("An error occurred while retrieving refs.")
+            messages.critical(
+                "An error occurred while retrieving develop branch."
+            )
             return False
 
-        commit_ref = None
-        for item in response.json():
-            if item["ref"] == "refs/heads/develop":
-                commit_ref = item["object"]["sha"]
-                break
+        try:
+            commit_ref = response.json()["commit"]["sha"]
 
-        if not commit_ref:
+        except Exception as exc:
+            messages.critical(exc)
             messages.critical(
                 "develop branch was not found on remote repository."
             )
@@ -398,9 +359,9 @@ class Glow(object):
         }
 
         response = session.post(
-            "{}/api/v3/repos/{}/git/refs".format(
-                self.glow_config.get("github", "url"),
-                self.glow_config.get("github", "repository_name"),
+            "{}/repos/{}/git/refs".format(
+                self.GITHUB_API_URL,
+                self.github_repository_name,
             ),
             headers=headers,
             data=json.dumps(payload),
@@ -410,30 +371,25 @@ class Glow(object):
             messages.success(
                 "New branch: feature/{} created".format(feature_name)
             )
-
-            if self._pull_branch(
+            self._pull_branch(
                 "feature/{}".format(feature_name), create_branch=True
-            ):
-                messages.success(
-                    'Switched to a new branch "feature/{}".'.format(
-                        feature_name
-                    )
-                )
-                return True
-
-            else:
-                messages.critical(
-                    "Unable to checkout to branch: feature/{}".format(
-                        feature_name
-                    )
-                )
-                return False
+            )
+            messages.success(
+                'Switched to a new branch "feature/{}".'.format(feature_name)
+            )
+            return True
 
         elif response.status_code == 422:
-            messages.error(
+            messages.warning(
                 "Feature branch feature/{} already exists.".format(feature_name)
             )
-            return False
+            self._pull_branch(
+                "feature/{}".format(feature_name), create_branch=True
+            )
+            messages.success(
+                'Switched to a new branch "feature/{}".'.format(feature_name)
+            )
+            return True
 
         else:
             messages.critical(
@@ -445,7 +401,7 @@ class Glow(object):
             )
             return False
 
-    def review_feature(self, issue_id, description=None):
+    def review_feature(self, issue_id):
         try:
             issue_id = int(issue_id)
 
@@ -463,10 +419,10 @@ class Glow(object):
             )
             sys.exit(1)
 
-        feature_name = self._get_feature_branch(issue_id)
+        feature_name = "feature/{}-{}".format(self.jira_project_key, issue_id)
 
         # Push feature branch to origin
-        messages.log("Push feature branch to origin")
+        messages.log("Push feature branch «{}» to origin".format(feature_name))
         self._push_branch(feature_name)
 
         # Pull last modifications from develop
@@ -480,24 +436,22 @@ class Glow(object):
         session = requests.Session()
 
         headers = {
-            "Authorization": "token {}".format(
-                self.glow_config.get("github", "token")
-            ),
+            "Authorization": "token {}".format(self.github_token),
             "Content-Type": "application/json",
         }
 
-        title, body = feature_name.replace("feature/", "").split("_", 1)
+        title = feature_name.replace("feature/", "")
         payload = {
             "title": title,
-            "body": body.replace("-", " ").capitalize(),
+            "body": title,
             "head": feature_name,
             "base": "develop",
         }
 
         response = session.post(
-            "{}/api/v3/repos/{}/pulls".format(
-                self.glow_config.get("github", "url"),
-                self.glow_config.get("github", "repository_name"),
+            "{}/repos/{}/pulls".format(
+                self.GITHUB_API_URL,
+                self.github_repository_name,
             ),
             headers=headers,
             data=json.dumps(payload),
@@ -518,29 +472,9 @@ class Glow(object):
             return False
 
     def cancel_feature(self, issue_id, description=None):
-        try:
-            issue_id = int(issue_id)
+        messages.warning("Not implemented yet")
 
-        except ValueError:
-            messages.critical('IssueID "{}" is not valid.'.format(issue_id))
-            sys.exit(1)
-
-        except TypeError:
-            messages.critical("IssueID is not set.")
-            sys.exit(1)
-
-        if not self._feature_exists(issue_id):
-            messages.error(
-                "There is no feature for IssueID {}.".format(issue_id)
-            )
-            sys.exit(1)
-
-        feature_name = self._get_feature_branch(issue_id)
-        messages.log(feature_name)
-
-    """
-    Release methods
-    """
+    """ Release methods """
 
     def start_release(self, is_master=False):
         """Open an application release"""
@@ -804,9 +738,7 @@ class Glow(object):
     def cancel_release(self, is_master=False):
         messages.warning("Not implemented yet")
 
-    """
-    Hotfix methods
-    """
+    """ Hotfix methods """
 
     def start_hotfix(self):
         """Open an application release"""
