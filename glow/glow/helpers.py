@@ -1,4 +1,7 @@
+import json
 import sys
+
+from requests import Session
 
 from . import messages
 
@@ -14,3 +17,24 @@ def parse_args():
         args = parser.parse_args()
         
     return args
+    
+    
+    
+def create_pull_request(source_branch, dest_branch, title, body, github_token ):
+    session = Session()
+    
+    headers = {
+        "Authorization": "token {}".format(github_token),
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "": title,
+        "body": body,
+        "head": source_branch,
+        "base": dest_branch,
+    }
+    
+    response = session.post(""
+    , headers=headers,
+    data=json.dumps(payload)
+    )
