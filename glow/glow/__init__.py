@@ -45,16 +45,22 @@ class Glow(object):
             self.repo.git.checkout(branch_name)
             self.repo.git.pull("origin")
 
-        messages.success('Branch "{}" pulled.'.format(branch_name))
+        messages.success("↓ «{}» pulled.".format(branch_name))
 
     def _push_branch(self, branch_name):
         self.repo.git.push("origin", branch_name)
+        messages.success("↑ «{}» pushed.".format(branch_name))
 
     def _tags(self):
         return [branch.name for branch in self.repo.branches]
 
+    def _pull_tags(self):
+        self.repo.git.fetch("origin", "--tags")
+        messages.success("↓ tags pulled.")
+
     def _push_tags(self):
         self.repo.git.push("origin", "--tags")
+        messages.success("↑ tags pushed.")
 
     def _create_config(self):
         self.jira_project_key = messages.question("Jira Project Key? ").upper()
@@ -143,7 +149,7 @@ class Glow(object):
 
             self.repo.create_tag(self.version, ref=first_commit)
 
-            self.repo.git.push("origin", "--tags")
+            self._push_tags()
             messages.success(
                 "Version {} pushed to remote repository".format(self.version)
             )
@@ -158,9 +164,11 @@ class Glow(object):
 
         self._init_repo()
 
-        messages.info("Working Directory: {}".format(self.working_directory))
-        messages.info("Git Directory: {}".format(self.git_directory))
-        messages.info("Current Directory: {}".format(self.current_directory))
+        messages.info("-----------------------")
+        messages.info("  Working Directory: {}".format(self.working_directory))
+        messages.info("  Git Directory: {}".format(self.git_directory))
+        messages.info("  Current Directory: {}".format(self.current_directory))
+        messages.info("-----------------------")
 
         self._init_glow()
         self._init_version()
@@ -170,22 +178,26 @@ class Glow(object):
     def start_feature(self, issue_id):
         issue_id = validators.validate_issue_id(issue_id)
         feature_name = "{}-{}".format(self.jira_project_key, issue_id)
+        branch_name = "feature/{}".format(feature_name)
 
-        if self._feature_exists(issue_id):
-            messages.error(
-                "A feature locally exists for IssueID {}.".format(issue_id)
-            )
+        if self._branch_exists(feature_name):
+            messages.error("{} already exists locally.".format(branch_name))
             return False
 
-        question = "Validate this feature name -> feature/{}? [y/n] ".format(
-            feature_name
-        )
+        if integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("{} already exists remotely.".format(branch_name))
+            self._pull_branch(branch_name)
+            return False
+
+        question = "Start this feature name: «{}» [y/n] ".format(branch_name)
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
             self.github_token, self.github_repository_name, "develop"
         )
-        commit_ref = "refs/heads/feature/{}".format(feature_name)
+        commit_ref = "refs/heads/{}".format(branch_name)
 
         status_code = integrations.create_branch(
             self.github_token,
@@ -195,14 +207,10 @@ class Glow(object):
         )
 
         if status_code == 201:
+            messages.success("New branch: {} created".format(branch_name))
+            self._pull_branch(branch_name, create_branch=True)
             messages.success(
-                "New branch: feature/{} created".format(feature_name)
-            )
-            self._pull_branch(
-                "feature/{}".format(feature_name), create_branch=True
-            )
-            messages.success(
-                'Switched to a new branch "feature/{}".'.format(feature_name)
+                "Switched to a new branch «{}».".format(branch_name)
             )
             return True
 
@@ -303,10 +311,9 @@ class Glow(object):
     """ Release methods """
 
     def start_release(self):
-        release_name = None
-        question = "Validate this release name -> release/{}? [y/n] ".format(
-            release_name
-        )
+        release_name = self.version.bump_minor()
+        # branch_name = "release/{}".format(release_name)
+        question = "Start this release «{}» [y/n] ".format(release_name)
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
@@ -371,11 +378,9 @@ class Glow(object):
     """ Hotfix methods """
 
     def start_hotfix(self):
-        hotfix_name = None
-
-        question = "Validate this hotfix name -> hotfix/{}? [y/n] ".format(
-            hotfix_name
-        )
+        hotfix_name = self.version.bump_patch()
+        # branch_name = "hotfix/{}".format(hotfix_name)
+        question = "Start this hotfix {} [y/n] ".format(hotfix_name)
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
