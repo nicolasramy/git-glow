@@ -9,7 +9,7 @@ setup(
     license="MIT",
     description=(
         "A new git extension to use git flow "
-        "branching model automatically on Github"
+        "branching model automatically with Jira and Github"
     ),
     long_description=open("README.md").read(),
     data_files=[(".", ["version"])],
