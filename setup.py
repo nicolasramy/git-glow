@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="glow",
-    version="0.2.3",
+    version="0.2.4",
     packages=find_packages(),
     author="Nicolas RAMY",
     author_email="nicolas.ramy@darkelda.com",
@@ -18,6 +18,7 @@ setup(
     install_requires=[
         "colorama==0.4.4",
         "click==8.0.0a1",
+        "emoji==1.2.0",
         "gitpython==3.1.12",
         "idna==2.10",
         "python-slugify==4.0.1",

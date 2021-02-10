@@ -1,29 +1,30 @@
+from emoji import emojize
 from termcolor import colored
 
 
 def log(message):
-    print(message)
+    print(emojize(message))
 
 
 def info(message):
-    print(colored(message, "blue"))
+    print(colored(emojize(message), "blue"))
 
 
 def success(message):
-    print(colored(message, "green"))
+    print(colored(emojize(message), "green"))
 
 
 def warning(message):
-    print(colored(message, "yellow"))
+    print(colored(emojize(message), "yellow"))
 
 
 def error(message):
-    print(colored(message, "red"))
+    print(colored(emojize(message), "red"))
 
 
 def critical(message):
-    print(colored(message, "grey", "on_red"))
+    print(colored(emojize(message), "grey", "on_red"))
 
 
 def question(message):
-    return input(colored(message, "cyan", attrs=["bold"]))
+    return input(colored(emojize(message), "cyan", attrs=["bold"]))

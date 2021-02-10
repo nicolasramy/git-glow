@@ -16,7 +16,7 @@ from . import helpers, integrations, messages, validators
 
 class Glow(object):
 
-    version = None
+    version = "0.0.0"
 
     repo = None
     config = None
@@ -39,11 +39,11 @@ class Glow(object):
 
     def _pull_branch(self, branch_name, create_branch=False):
         if create_branch:
-            self.repo.git.pull("origin")
+            self.repo.git.pull("origin", branch_name)
             self.repo.git.checkout("HEAD", b=branch_name)
         else:
             self.repo.git.checkout(branch_name)
-            self.repo.git.pull("origin")
+            self.repo.git.pull("origin", branch_name)
 
         messages.success("↓ «{}» pulled.".format(branch_name))
 
@@ -157,7 +157,8 @@ class Glow(object):
         else:
             tags.sort(reverse=True)
             latest = tags[0]
-            messages.log("Latest version: {}".format(latest))
+            self.version = semver.VersionInfo.parse(latest)
+            messages.log(" :label: Latest version: {}".format(latest))
 
     def __init__(self):
         """Initialize Github Flow CLI"""
@@ -165,13 +166,6 @@ class Glow(object):
         colorama.init(autoreset=True)
 
         self._init_repo()
-
-        messages.info("←--------------------")
-        messages.info(" Working Directory: {}".format(self.working_directory))
-        messages.info(" Git Directory: {}".format(self.git_directory))
-        messages.info(" Current Directory: {}".format(self.current_directory))
-        messages.info("--------------------→")
-
         self._init_glow()
         self._init_version()
 
@@ -193,7 +187,7 @@ class Glow(object):
             self._pull_branch(branch_name)
             return False
 
-        question = "Start this feature name: «{}» [y/n] ".format(branch_name)
+        question = "Start feature name: «{}» [y/n] ".format(branch_name)
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
@@ -315,7 +309,7 @@ class Glow(object):
     def start_release(self):
         release_name = self.version.bump_minor()
         # branch_name = "release/{}".format(release_name)
-        question = "Start this release «{}» [y/n] ".format(release_name)
+        question = "Start release «{}» [y/n] ".format(release_name)
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
@@ -382,7 +376,7 @@ class Glow(object):
     def start_hotfix(self):
         hotfix_name = self.version.bump_patch()
         # branch_name = "hotfix/{}".format(hotfix_name)
-        question = "Start this hotfix {} [y/n] ".format(hotfix_name)
+        question = "Start hotfix {} [y/n] ".format(hotfix_name)
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
@@ -453,7 +447,7 @@ class Glow(object):
         validators.validate_method_name(method_name, methods_names)
 
         _func = getattr(self, method_name)
-        _func(args.key)
+        _func(*args.key)
 
 
 if __name__ == "__main__":
