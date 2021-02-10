@@ -52,7 +52,7 @@ class Glow(object):
         messages.success("↑ «{}» pushed.".format(branch_name))
 
     def _tags(self):
-        return [branch.name for branch in self.repo.branches]
+        return [tag.name for tag in self.repo.tags]
 
     def _pull_tags(self):
         self.repo.git.fetch("origin", "--tags")
@@ -134,7 +134,7 @@ class Glow(object):
                         # fmt: on
 
     def _init_version(self):
-        tags = self.repo.tags
+        tags = self._tags()
 
         if not tags:
             self.version = semver.VersionInfo.parse(self.version)
@@ -155,7 +155,9 @@ class Glow(object):
             )
 
         else:
-            messages.log("Latest version: ...")
+            tags.sort(reverse=True)
+            latest = tags[0]
+            messages.log("Latest version: {}".format(latest))
 
     def __init__(self):
         """Initialize Github Flow CLI"""
@@ -164,11 +166,11 @@ class Glow(object):
 
         self._init_repo()
 
-        messages.info("-----------------------")
-        messages.info("  Working Directory: {}".format(self.working_directory))
-        messages.info("  Git Directory: {}".format(self.git_directory))
-        messages.info("  Current Directory: {}".format(self.current_directory))
-        messages.info("-----------------------")
+        messages.info("←--------------------")
+        messages.info(" Working Directory: {}".format(self.working_directory))
+        messages.info(" Git Directory: {}".format(self.git_directory))
+        messages.info(" Current Directory: {}".format(self.current_directory))
+        messages.info("--------------------→")
 
         self._init_glow()
         self._init_version()
@@ -448,7 +450,7 @@ class Glow(object):
         method_name = "{}_{}".format(args.action, args.entity)
         methods_names = helpers.get_method_names(self)
 
-        helpers.validate_method_name(method_name, methods_names)
+        validators.validate_method_name(method_name, methods_names)
 
         _func = getattr(self, method_name)
         _func(args.key)

@@ -2,7 +2,7 @@ import json
 
 from requests import Session
 
-import messages
+from . import messages
 
 
 GITHUB_API_URL = "https://api.github.com"
@@ -79,3 +79,5 @@ def create_pull_request(github_token, source_branch, dest_branch, title, body):
     response = session.post(
         "{}".format(GITHUB_API_URL), headers=headers, data=json.dumps(payload)
     )
+
+    return response.status_code

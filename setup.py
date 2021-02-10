@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="glow",
-    version="0.0.0",
+    version="0.2.3",
     packages=find_packages(),
     author="Nicolas RAMY",
     author_email="nicolas.ramy@darkelda.com",
@@ -12,8 +12,6 @@ setup(
         "branching model automatically with Jira and Github"
     ),
     long_description=open("README.md").read(),
-    data_files=[(".", ["version"])],
-    include_package_data=True,
     entry_points={
         "console_scripts": ["git-glow=glow.__main__:main"],
     },

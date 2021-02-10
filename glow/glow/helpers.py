@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-import messages
+from . import messages
 
 
 def parse_args():
