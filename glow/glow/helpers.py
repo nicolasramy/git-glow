@@ -1,7 +1,7 @@
 import argparse
-import json
+import sys
 
-from requests import Session
+import messages
 
 
 def parse_args():
@@ -9,24 +9,27 @@ def parse_args():
     parser.add_argument("action")
     parser.add_argument("entity")
     parser.add_argument("key", nargs="*", default=None)
-
-    args = parser.parse_args()
-
-    return args
+    return parser.parse_args()
 
 
-def create_pull_request(source_branch, dest_branch, title, body, github_token):
-    session = Session()
+def get_method_names(klass):
+    return [
+        func
+        for func in dir(klass)
+        if callable(getattr(klass, func)) and not func.startswith("_")
+    ]
 
-    headers = {
-        "Authorization": "token {}".format(github_token),
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "": title,
-        "body": body,
-        "head": source_branch,
-        "base": dest_branch,
-    }
 
-    response = session.post("", headers=headers, data=json.dumps(payload))
+def ask(
+    question,
+    options=[
+        "y",
+    ],
+    exit_tty=True,
+):
+    answer = messages.question(question)
+    if answer.lower() not in options:
+        messages.warning("Quitting...")
+
+        if exit_tty:
+            sys.exit(1)

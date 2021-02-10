@@ -1,4 +1,3 @@
-import argparse
 import errno
 import json
 import os
@@ -10,12 +9,12 @@ from git.exc import InvalidGitRepositoryError
 import requests
 import semver
 
-from . import messages
+from . import helpers, integrations, messages, validators
+
+# from . import helpers, integrations, messages, models, validators
 
 
 class Glow(object):
-
-    GITHUB_API_URL = "https://api.github.com"
 
     version = None
 
@@ -29,9 +28,14 @@ class Glow(object):
     glow_config = None
 
     jira_project_key = None
-    github_url = None
     github_repository_name = None
     github_token = None
+
+    def _branches(self):
+        return [branch.name for branch in self.repo.branches]
+
+    def _branch_exists(self, branch_name):
+        return branch_name in self._branches()
 
     def _pull_branch(self, branch_name, create_branch=False):
         if create_branch:
@@ -46,31 +50,11 @@ class Glow(object):
     def _push_branch(self, branch_name):
         self.repo.git.push("origin", branch_name)
 
-    def _pull_repository(self):
-        """
-        Pull develop and main branches and tags
-        from origin and prune remote branches
-        """
-        ...
-
-    @staticmethod
-    def _push_repository():
-        """Push develop and master branches and tags to origin"""
-        ...
-
-    @staticmethod
-    def _generate_changelog(branch_from, branch_to):
-        """Generate changelog between two branches"""
-        ...
-
-    def _branches(self):
+    def _tags(self):
         return [branch.name for branch in self.repo.branches]
 
-    def _feature_exists(self, issue_id):
-        issue_id = str(issue_id)
-        feature_name = "feature/{}-{}".format(self.jira_project_key, issue_id)
-
-        return feature_name in self._branches()
+    def _push_tags(self):
+        self.repo.git.push("origin", "--tags")
 
     def _create_config(self):
         self.jira_project_key = messages.question("Jira Project Key? ").upper()
@@ -184,17 +168,7 @@ class Glow(object):
     """ Feature methods """
 
     def start_feature(self, issue_id):
-        try:
-            issue_id = int(issue_id)
-
-        except ValueError:
-            messages.critical('IssueID "{}" is not valid.'.format(issue_id))
-            sys.exit(1)
-
-        except TypeError:
-            messages.critical("IssueID is not set.")
-            sys.exit(1)
-
+        issue_id = validators.validate_issue_id(issue_id)
         feature_name = "{}-{}".format(self.jira_project_key, issue_id)
 
         if self._feature_exists(issue_id):
@@ -203,62 +177,24 @@ class Glow(object):
             )
             return False
 
-        create_feature = messages.question(
-            "Validate this feature name -> feature/{}? [y/n] ".format(
-                feature_name
-            )
+        question = "Validate this feature name -> feature/{}? [y/n] ".format(
+            feature_name
         )
-        if create_feature.lower() != "y":
-            messages.warning("Quitting...")
-            sys.exit(1)
+        helpers.ask(question)
 
-        # Create remote and local branch
-        session = requests.Session()
+        commit_sha = integrations.branch_exists(
+            self.github_token, self.github_repository_name, "develop"
+        )
+        commit_ref = "refs/heads/feature/{}".format(feature_name)
 
-        headers = {
-            "Authorization": "token {}".format(self.github_token),
-            "Content-Type": "application/json",
-        }
-
-        response = session.get(
-            "{}/repos/{}/branches/develop".format(
-                self.GITHUB_API_URL,
-                self.github_repository_name,
-            ),
-            headers=headers,
+        status_code = integrations.create_branch(
+            self.github_token,
+            self.github_repository_name,
+            commit_ref,
+            commit_sha,
         )
 
-        if response.status_code != 200:
-            messages.critical(
-                "An error occurred while retrieving develop branch."
-            )
-            return False
-
-        try:
-            commit_ref = response.json()["commit"]["sha"]
-
-        except Exception as exc:
-            messages.critical(exc)
-            messages.critical(
-                "develop branch was not found on remote repository."
-            )
-            return False
-
-        payload = {
-            "ref": "refs/heads/feature/{}".format(feature_name),
-            "sha": commit_ref,
-        }
-
-        response = session.post(
-            "{}/repos/{}/git/refs".format(
-                self.GITHUB_API_URL,
-                self.github_repository_name,
-            ),
-            headers=headers,
-            data=json.dumps(payload),
-        )
-
-        if response.status_code == 201:
+        if status_code == 201:
             messages.success(
                 "New branch: feature/{} created".format(feature_name)
             )
@@ -270,7 +206,7 @@ class Glow(object):
             )
             return True
 
-        elif response.status_code == 422:
+        elif status_code == 422:
             messages.warning(
                 "Feature branch feature/{} already exists.".format(feature_name)
             )
@@ -284,10 +220,9 @@ class Glow(object):
 
         else:
             messages.critical(
-                "Feature branch feature/{} can not be created ({}: {}).".format(
+                "Feature branch feature/{} can not be created ({}:).".format(
                     feature_name,
-                    response.status_code,
-                    response.json()["message"],
+                    status_code,
                 )
             )
             return False
@@ -367,86 +302,36 @@ class Glow(object):
 
     """ Release methods """
 
-    def start_release(self, is_master=False):
-        """Open an application release"""
-        self._pull_repository()
-
-        # Change version
-        if is_master:
-            self.version["master"] += 1
-        else:
-            self.version["release"] += 1
-
-        self.version["hotfix"] = 0
-
-        create_release = messages.question(
-            "Validate this release name -> release/{}? [y/n] ".format(
-                self._str_version()
-            )
+    def start_release(self):
+        release_name = None
+        question = "Validate this release name -> release/{}? [y/n] ".format(
+            release_name
         )
-        if create_release.lower() != "y":
-            messages.warning("Quitting...")
-            sys.exit(errno.ENOMSG)
+        helpers.ask(question)
 
-        # Create remote and local branch
-        session = requests.Session()
+        commit_sha = integrations.branch_exists(
+            self.github_token, self.github_repository_name, "develop"
+        )
+        commit_ref = "refs/heads/release/{}".format(release_name)
 
-        headers = {
-            "Authorization": "token {}".format(
-                self.glow_config.get("github", "token")
-            ),
-            "Content-Type": "application/json",
-        }
-
-        response = session.get(
-            "{}/api/v3/repos/{}/git/refs/heads".format(
-                self.glow_config.get("github", "url"),
-                self.glow_config.get("github", "repository_name"),
-            ),
-            headers=headers,
+        status_code = integrations.create_branch(
+            self.github_token,
+            self.github_repository_name,
+            commit_ref,
+            commit_sha,
         )
 
-        if response.status_code != 200:
-            messages.critical("An error occurred while retrieving refs.")
-            return False
-
-        commit_ref = None
-        for item in response.json():
-            if item["ref"] == "refs/heads/develop":
-                commit_ref = item["object"]["sha"]
-                break
-
-        if not commit_ref:
-            messages.critical(
-                "develop branch was not found on remote repository."
-            )
-            return False
-
-        payload = {
-            "ref": "refs/heads/release/{}".format(self._str_version()),
-            "sha": commit_ref,
-        }
-
-        response = session.post(
-            "{}/api/v3/repos/{}/git/refs".format(
-                self.glow_config.get("github", "url"),
-                self.glow_config.get("github", "repository_name"),
-            ),
-            headers=headers,
-            data=json.dumps(payload),
-        )
-
-        if response.status_code == 201:
+        if status_code == 201:
             messages.success(
-                "New branch: release/{} created".format(self._str_version())
+                "New branch: release/{} created".format(release_name)
             )
 
             if self._pull_branch(
-                "release/{}".format(self._str_version()), create_branch=True
+                "release/{}".format(release_name), create_branch=True
             ):
                 messages.success(
                     'Switched to a new branch "release/{}".'.format(
-                        self._str_version()
+                        release_name
                     )
                 )
                 ...
@@ -454,25 +339,22 @@ class Glow(object):
             else:
                 messages.critical(
                     "Unable to checkout to branch: release/{}".format(
-                        self._str_version()
+                        release_name
                     )
                 )
                 return False
 
-        elif response.status_code == 422:
+        elif status_code == 422:
             messages.error(
-                "Feature branch release/{} already exists.".format(
-                    self._str_version()
-                )
+                "Feature branch release/{} already exists.".format(release_name)
             )
             return False
 
         else:
             messages.critical(
-                "Release branch release/{} can not be created ({}: {}).".format(
-                    self._str_version(),
-                    response.status_code,
-                    response.json()["message"],
+                "Release branch release/{} can not be created ({}).".format(
+                    release_name,
+                    status_code,
                 )
             )
             return False
@@ -489,106 +371,57 @@ class Glow(object):
     """ Hotfix methods """
 
     def start_hotfix(self):
-        """Open an application release"""
-        self._pull_repository()
+        hotfix_name = None
 
-        # Change version
-        self.version["hotfix"] += 1
-
-        create_hotfix = messages.question(
-            "Validate this hotfix name -> hotfix/{}? [y/n] ".format(
-                self._str_version()
-            )
+        question = "Validate this hotfix name -> hotfix/{}? [y/n] ".format(
+            hotfix_name
         )
-        if create_hotfix.lower() != "y":
-            messages.warning("Quitting...")
-            sys.exit(errno.ENOMSG)
+        helpers.ask(question)
 
-        # Create remote and local branch
-        session = requests.Session()
+        commit_sha = integrations.branch_exists(
+            self.github_token, self.github_repository_name, "master"
+        )
+        commit_ref = "refs/heads/hotfix/{}".format(hotfix_name)
 
-        headers = {
-            "Authorization": "token {}".format(
-                self.glow_config.get("github", "token")
-            ),
-            "Content-Type": "application/json",
-        }
-
-        response = session.get(
-            "{}/api/v3/repos/{}/git/refs/heads".format(
-                self.glow_config.get("github", "url"),
-                self.glow_config.get("github", "repository_name"),
-            ),
-            headers=headers,
+        status_code = integrations.create_branch(
+            self.github_token,
+            self.github_repository_name,
+            commit_ref,
+            commit_sha,
         )
 
-        if response.status_code != 200:
-            messages.critical("An error occurred while retrieving refs.")
-            return False
-
-        commit_ref = None
-        for item in response.json():
-            if item["ref"] == "refs/heads/master":
-                commit_ref = item["object"]["sha"]
-                break
-
-        if not commit_ref:
-            messages.critical(
-                "master branch was not found on remote repository."
-            )
-            return False
-
-        payload = {
-            "ref": "refs/heads/hotfix/{}".format(self._str_version()),
-            "sha": commit_ref,
-        }
-
-        response = session.post(
-            "{}/api/v3/repos/{}/git/refs".format(
-                self.glow_config.get("github", "url"),
-                self.glow_config.get("github", "repository_name"),
-            ),
-            headers=headers,
-            data=json.dumps(payload),
-        )
-
-        if response.status_code == 201:
+        if status_code == 201:
             messages.success(
-                "New branch: hotfix/{} created".format(self._str_version())
+                "New branch: hotfix/{} created".format(hotfix_name)
             )
 
             if self._pull_branch(
-                "hotfix/{}".format(self._str_version()), create_branch=True
+                "hotfix/{}".format(hotfix_name), create_branch=True
             ):
                 messages.success(
-                    'Switched to a new branch "hotfix/{}".'.format(
-                        self._str_version()
-                    )
+                    'Switched to a new branch "hotfix/{}".'.format(hotfix_name)
                 )
                 return True
 
             else:
                 messages.critical(
                     "Unable to checkout to branch: hotfix/{}".format(
-                        self._str_version()
+                        hotfix_name
                     )
                 )
                 return False
 
-        elif response.status_code == 422:
+        elif status_code == 422:
             messages.error(
-                "Feature branch hotfix/{} already exists.".format(
-                    self._str_version()
-                )
+                "Feature branch hotfix/{} already exists.".format(hotfix_name)
             )
             return False
 
         else:
             messages.critical(
-                "Release branch hotfix/{} can not be created ({}: {}).".format(
-                    self._str_version(),
-                    response.status_code,
-                    response.json()["message"],
+                "Release branch hotfix/{} can not be created ({}).".format(
+                    hotfix_name,
+                    status_code,
                 )
             )
             return False
@@ -605,27 +438,12 @@ class Glow(object):
     """Main"""
 
     def main(self):
-        parser = argparse.ArgumentParser(
-            description="Glow your workflow"
-        )
-        parser.add_argument("action")
-        parser.add_argument("entity")
-        parser.add_argument("key", nargs="*", default=None)
+        args = helpers.parse_args()
 
-        args = parser.parse_args()
-
-        methods_list = [
-            func
-            for func in dir(self)
-            if callable(getattr(self, func)) and not func.startswith("_")
-        ]
         method_name = "{}_{}".format(args.action, args.entity)
+        methods_names = helpers.get_method_names(self)
 
-        if method_name not in methods_list:
-            messages.error(
-                "Unknown command «{} {}»".format(args.action, args.entity)
-            )
-            sys.exit(1)
+        helpers.validate_method_name(method_name, methods_names)
 
         _func = getattr(self, method_name)
         _func(args.key)

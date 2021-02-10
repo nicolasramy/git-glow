@@ -1,11 +1,26 @@
+import sys
+
+from . import messages
+
+
 def validate_issue_id(issue_id):
     try:
         issue_id = int(issue_id)
 
     except ValueError:
-        return False, "Issue ID: «{}» is not valid.".format(issue_id)
+        messages.critical('IssueID "{}" is not valid.'.format(issue_id))
+        sys.exit(1)
 
     except TypeError:
-        return False, "IssueID is not set."
+        messages.critical("IssueID is not set.")
+        sys.exit(1)
 
-    return True, issue_id
+    return issue_id
+
+
+def validate_method_name(method_name, methods_names):
+    if method_name not in methods_names:
+        messages.error(
+            "Unknown command «{}»".format(" ".join(method_name.split("_")))
+        )
+        sys.exit(1)
