@@ -1,5 +1,5 @@
-# git-glow
-A new git extension to use git flow branching model automatically on Github
+# Glow
+A new git extension to use git flow branching model automatically with Jira and Github
 
 ## Requirements
 
@@ -9,6 +9,24 @@ A new git extension to use git flow branching model automatically on Github
 In a git repository with a **develop** and **main** branch.
 
 More information about [gitflow](http://nvie.com/posts/a-successful-git-branching-model/). 
+
+## TODO
+
+- [ ] Factorize `finish_release` and `finish_hotfix`
+- [ ] Toggle project-key-id  
+- [ ] Toggle github integration 
+- [ ] Toggle jira integration 
+- [ ] Implement cancel methods:
+    - [ ] `cancel_feature` 
+    - [ ] `cancel_release` 
+    - [ ] `cancel_feature` 
+- [ ] Better handling for changelog generation and tag
+- [x] Improve slugify
+- [x] Secure creation
+    - [x] feature
+    - [x] release
+    - [x] hotfix
+  
 
 ## How to setup
 
@@ -107,20 +125,5 @@ And merge the generated tag into **develop** branch.
 ```bash
 git glow finish hotfix
 ```
-
-
-## TODO
-
-- [ ] Factorize `finish_release` and `finish_hotfix`
-- [ ] Implement cancel methods:
-    - [ ] `cancel_feature` 
-    - [ ] `cancel_release` 
-    - [ ] `cancel_feature` 
-- [ ] Better handling for changelog generation and tag
-- [x] Improve slugify
-- [x] Secure creation
-    - [x] feature
-    - [x] release
-    - [x] hotfix
 
 
