@@ -3,10 +3,9 @@ def validate_issue_id(issue_id):
         issue_id = int(issue_id)
 
     except ValueError:
-        return (False, "Issue ID: «{}» is not valid.".format(issue_id))
-        
-    except TypeError:
-        return (False, "IssueID is not set.")
-        sys.exit(1)
+        return False, "Issue ID: «{}» is not valid.".format(issue_id)
 
-    return (True, issue_id)
+    except TypeError:
+        return False, "IssueID is not set."
+
+    return True, issue_id
