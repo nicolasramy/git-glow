@@ -52,6 +52,12 @@ pip3 install --force-reinstall .
 pip3 install .
 ```
 
+OR
+
+```
+pip install git-glow
+```
+
 ## Usage
 
 To use this command, just type ```git glow``` in a git repository
