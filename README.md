@@ -1,5 +1,4 @@
 # Glow
-More information about 
 A simple git extension to use [git flow branching model](http://nvie.com/posts/a-successful-git-branching-model/). automatically with Github 
 and [semver](https://semver.org/) to tags your releases and hotfixes.
 
