@@ -88,4 +88,6 @@ def create_pull_request(
         return response.status_code, response.json().get("html_url")
 
     else:
-        return response.status_code, [_ for _ in response.json.get("errors")]
+        return response.status_code, [
+            _.get("message") for _ in response.json().get("errors")
+        ]

@@ -37,8 +37,13 @@ class Glow(object):
     def _rebase_branch(self, branch_name):
         return self.repo.git.rebase(branch_name)
 
-    def _pull_branch(self, branch_name):
-        self.repo.git.checkout(branch_name)
+    def _pull_branch(self, branch_name, create=False):
+        if create:
+            self.repo.git.checkout("-b", branch_name)
+
+        else:
+            self.repo.git.checkout(branch_name)
+
         self.repo.git.pull("origin", branch_name)
 
         messages.success("↓ «{}» pulled.".format(branch_name))
@@ -50,10 +55,16 @@ class Glow(object):
         else:
             self.repo.git.push("origin", branch_name)
 
-        messages.success("↑ «{}» pushed.".format(branch_name))
+        messages.info("↑ «{}» pushed.".format(branch_name))
 
     def _tags(self):
         return [tag.name for tag in self.repo.tags]
+
+    def _create_tag(self, version, ref=None):
+        if ref:
+            return self.repo.create_tag(version, ref=ref)
+        else:
+            return self.repo.create_tag(version)
 
     def _pull_tags(self):
         self.repo.git.fetch("origin", "--tags")
@@ -61,7 +72,7 @@ class Glow(object):
 
     def _push_tags(self):
         self.repo.git.push("origin", "--tags")
-        messages.success("↑ tags pushed.")
+        messages.info("↑ tags pushed.")
 
     def _get_changes(self, source_branch, dest_branch):
         return self.repo.git.log(
@@ -153,7 +164,7 @@ class Glow(object):
                 )
             )
 
-            self.repo.create_tag(self.version, ref=first_commit)
+            self._create_tag(self.version, first_commit)
 
             self._push_tags()
             messages.success(
@@ -164,7 +175,7 @@ class Glow(object):
             tags.sort(reverse=True)
             latest = tags[0]
             self.version = semver.VersionInfo.parse(latest)
-            messages.log(" :label:   Latest version: {}".format(latest))
+            messages.log(":label:  Latest version: {}".format(latest))
 
     def __init__(self):
         """Initialize Github Flow CLI"""
@@ -189,9 +200,10 @@ class Glow(object):
         if integrations.branch_exists(
             self.github_token, self.github_repository_name, branch_name
         ):
-            messages.error("«{}» already exists remotely.".format(branch_name))
-            self._pull_branch(branch_name)
-            # self.(branch_name)
+            messages.warning(
+                "«{}» already exists remotely.".format(branch_name)
+            )
+            self._pull_branch(branch_name, create=True)
             return False
 
         question = "Start feature name: «{}» [y/n] ".format(branch_name)
@@ -211,7 +223,7 @@ class Glow(object):
 
         if status_code == 201:
             messages.success("«{}» created on Github".format(branch_name))
-            self._pull_branch(branch_name)
+            self._pull_branch(branch_name, create=True)
             messages.success("Switch to «{}».".format(branch_name))
             return True
 
@@ -291,8 +303,10 @@ class Glow(object):
         if integrations.branch_exists(
             self.github_token, self.github_repository_name, branch_name
         ):
-            messages.error("«{}» already exists remotely.".format(branch_name))
-            self._pull_branch(branch_name)
+            messages.warning(
+                "«{}» already exists remotely.".format(branch_name)
+            )
+            self._pull_branch(branch_name, create=True)
             return False
 
         if integrations.branch_exists(
@@ -305,6 +319,8 @@ class Glow(object):
 
         question = "Start release «{}» [y/n] ".format(release_name)
         helpers.ask(question)
+
+        self._pull_branch("develop")
 
         commit_sha = integrations.branch_exists(
             self.github_token, self.github_repository_name, "develop"
@@ -320,13 +336,13 @@ class Glow(object):
 
         if status_code == 201:
             messages.success("«{}» created on Github".format(branch_name))
-            self._pull_branch(branch_name)
-            messages.success("Switch to «{}«.".format(branch_name))
+            self._pull_branch(branch_name, create=True)
+            messages.success("Switch to «{}».".format(branch_name))
             return True
 
         elif status_code == 422:
             messages.warning("{} already exists on Github.".format(branch_name))
-            self._pull_branch(branch_name)
+            self._pull_branch(branch_name, create=True)
             messages.success("Switch to «{}».".format(branch_name))
             return True
 
@@ -339,11 +355,76 @@ class Glow(object):
             )
             return False
 
-    def review_release(self, is_master=False):
-        ...
+    def review_release(self):
+        release_name = self.version.bump_minor()
+        branch_name = "release/{}".format(release_name)
 
-    def finish_release(self, is_master=False):
-        ...
+        if not self._branch_exists(branch_name):
+            messages.error("«{}» doesn't exists locally.".format(branch_name))
+            return False
+
+        if not integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("«{}» doesn't exists remotely.".format(branch_name))
+            return False
+
+        self._change_branch("main")
+        self._pull_branch("main")
+
+        self._change_branch(branch_name)
+        self._rebase_branch("develop")
+        self._push_branch(branch_name, force=True)
+
+        changes = self._get_changes(branch_name, "main")
+
+        status_code, response = integrations.create_pull_request(
+            self.github_token,
+            self.github_repository_name,
+            branch_name,
+            "main",
+            str(release_name),
+            changes,
+        )
+
+        if status_code == 201:
+            messages.success("New PR created: {}".format(response))
+            return True
+
+        else:
+            for error in response:
+                messages.error(error)
+            return False
+
+    def finish_release(self):
+        release_name = self.version.bump_minor()
+        branch_name = "release/{}".format(release_name)
+
+        if not self._branch_exists(branch_name):
+            messages.error("«{}» doesn't exists locally.".format(branch_name))
+            return False
+
+        if not integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("«{}» doesn't exists remotely.".format(branch_name))
+            return False
+
+        self._change_branch("main")
+        self._pull_branch("main")
+
+        self._create_tag(str(release_name))
+
+        self._change_branch("develop")
+        self._pull_branch("develop")
+
+        self.repo.git.merge("--no-ff", branch_name)
+        self.repo.git.branch("-D", branch_name)
+        self.repo.git.push("origin", ":{}".format(branch_name))
+        self.repo.git.remote("prune", "origin")
+
+        self._push_tags()
+        messages.success("«{}» finished :fireworks:.".format(branch_name))
 
     def cancel_release(self, is_master=False):
         messages.warning("Not implemented yet")
