@@ -31,6 +31,12 @@ class Glow(object):
     def _branch_exists(self, branch_name):
         return branch_name in self._branches()
 
+    def _change_branch(self, branch_name):
+        return self.repo.git.checkout(branch_name)
+
+    def _rebase_branch(self, branch_name):
+        return self.repo.git.rebase(branch_name)
+
     def _pull_branch(self, branch_name):
         self.repo.git.checkout(branch_name)
         self.repo.git.pull("origin", branch_name)
@@ -176,7 +182,7 @@ class Glow(object):
         feature_name = "{}-{}".format(self.jira_project_key, issue_id)
         branch_name = "feature/{}".format(feature_name)
 
-        if self._branch_exists(feature_name):
+        if self._branch_exists(branch_name):
             messages.error("«{}» already exists locally.".format(branch_name))
             return False
 
@@ -185,6 +191,7 @@ class Glow(object):
         ):
             messages.error("«{}» already exists remotely.".format(branch_name))
             self._pull_branch(branch_name)
+            # self.(branch_name)
             return False
 
         question = "Start feature name: «{}» [y/n] ".format(branch_name)
@@ -238,11 +245,11 @@ class Glow(object):
             messages.error("«{}» doesn't exists remotely.".format(branch_name))
             return False
 
-        self.repo.git.checkout("develop")
+        self._change_branch("develop")
         self._pull_branch("develop")
 
-        self.repo.git.checkout(branch_name)
-        self.repo.git.rebase("develop")
+        self._change_branch(branch_name)
+        self._rebase_branch("develop")
         self._push_branch(branch_name, force=True)
 
         changes = self._get_changes(branch_name, "develop")
@@ -272,14 +279,37 @@ class Glow(object):
 
     def start_release(self):
         release_name = self.version.bump_minor()
-        # branch_name = "release/{}".format(release_name)
+        branch_name = "release/{}".format(release_name)
+
+        hotfix_name = self.version.bump_patch()
+        hotfix_branch_name = "hotfix/{}".format(hotfix_name)
+
+        if self._branch_exists(branch_name):
+            messages.error("«{}» already exists locally.".format(branch_name))
+            return False
+
+        if integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("«{}» already exists remotely.".format(branch_name))
+            self._pull_branch(branch_name)
+            return False
+
+        if integrations.branch_exists(
+            self.github_token, self.github_repository_name, hotfix_branch_name
+        ):
+            messages.critical(
+                "An hotfix «{}» is running...".format(hotfix_branch_name)
+            )
+            return False
+
         question = "Start release «{}» [y/n] ".format(release_name)
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
             self.github_token, self.github_repository_name, "develop"
         )
-        commit_ref = "refs/heads/release/{}".format(release_name)
+        commit_ref = "refs/heads/{}".format(branch_name)
 
         status_code = integrations.create_branch(
             self.github_token,
@@ -289,38 +319,21 @@ class Glow(object):
         )
 
         if status_code == 201:
-            messages.success(
-                "New branch: release/{} created".format(release_name)
-            )
-
-            if self._pull_branch(
-                "release/{}".format(release_name), create_branch=True
-            ):
-                messages.success(
-                    'Switched to a new branch "release/{}".'.format(
-                        release_name
-                    )
-                )
-                ...
-
-            else:
-                messages.critical(
-                    "Unable to checkout to branch: release/{}".format(
-                        release_name
-                    )
-                )
-                return False
+            messages.success("«{}» created on Github".format(branch_name))
+            self._pull_branch(branch_name)
+            messages.success("Switch to «{}«.".format(branch_name))
+            return True
 
         elif status_code == 422:
-            messages.error(
-                "Feature branch release/{} already exists.".format(release_name)
-            )
-            return False
+            messages.warning("{} already exists on Github.".format(branch_name))
+            self._pull_branch(branch_name)
+            messages.success("Switch to «{}».".format(branch_name))
+            return True
 
         else:
             messages.critical(
-                "Release branch release/{} can not be created ({}).".format(
-                    release_name,
+                "{} can not be created on Github ({}:).".format(
+                    branch_name,
                     status_code,
                 )
             )
