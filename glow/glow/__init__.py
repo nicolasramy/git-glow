@@ -14,6 +14,10 @@ class Glow(object):
 
     version = "0.0.0"
 
+    main_branch = "main"
+    develop_branch = "develop"
+    remote_name = "origin"
+
     repo = None
     config = None
 
@@ -44,16 +48,16 @@ class Glow(object):
         else:
             self.repo.git.checkout(branch_name)
 
-        self.repo.git.pull("origin", branch_name)
+        self.repo.git.pull(self.remote_name, branch_name)
 
         messages.success("↓ «{}» pulled.".format(branch_name))
 
     def _push_branch(self, branch_name, force=False):
         if force:
-            self.repo.git.push("origin", branch_name, "--force")
+            self.repo.git.push(self.remote_name, branch_name, "--force")
 
         else:
-            self.repo.git.push("origin", branch_name)
+            self.repo.git.push(self.remote_name, branch_name)
 
         messages.info("↑ «{}» pushed.".format(branch_name))
 
@@ -67,11 +71,11 @@ class Glow(object):
             return self.repo.create_tag(version)
 
     def _pull_tags(self):
-        self.repo.git.fetch("origin", "--tags")
+        self.repo.git.fetch(self.remote_name, "--tags")
         messages.success("↓ tags pulled.")
 
     def _push_tags(self):
-        self.repo.git.push("origin", "--tags")
+        self.repo.git.push(self.remote_name, "--tags")
         messages.info("↑ tags pushed.")
 
     def _get_changes(self, source_branch, dest_branch):
@@ -210,7 +214,7 @@ class Glow(object):
         helpers.ask(question)
 
         commit_sha = integrations.branch_exists(
-            self.github_token, self.github_repository_name, "develop"
+            self.github_token, self.github_repository_name, self.develop_branch
         )
         commit_ref = "refs/heads/{}".format(branch_name)
 
@@ -257,20 +261,20 @@ class Glow(object):
             messages.error("«{}» doesn't exists remotely.".format(branch_name))
             return False
 
-        self._change_branch("develop")
-        self._pull_branch("develop")
+        self._change_branch(self.develop_branch)
+        self._pull_branch(self.develop_branch)
 
         self._change_branch(branch_name)
-        self._rebase_branch("develop")
+        self._rebase_branch(self.develop_branch)
         self._push_branch(branch_name, force=True)
 
-        changes = self._get_changes(branch_name, "develop")
+        changes = self._get_changes(branch_name, self.develop_branch)
 
         status_code, response = integrations.create_pull_request(
             self.github_token,
             self.github_repository_name,
             branch_name,
-            "develop",
+            self.develop_branch,
             feature_name,
             changes,
         )
@@ -299,12 +303,12 @@ class Glow(object):
             messages.error("«{}» doesn't exists remotely.".format(branch_name))
             return False
 
-        self._change_branch("develop")
-        self._pull_branch("develop")
+        self._change_branch(self.develop_branch)
+        self._pull_branch(self.develop_branch)
 
         self.repo.git.branch("-D", branch_name)
-        self.repo.git.push("origin", ":{}".format(branch_name))
-        self.repo.git.remote("prune", "origin")
+        self.repo.git.push(self.remote_name, ":{}".format(branch_name))
+        self.repo.git.remote("prune", self.remote_name)
 
         messages.success(":fireworks:  «{}» finished.".format(branch_name))
 
@@ -344,10 +348,10 @@ class Glow(object):
         question = "Start release «{}» [y/n] ".format(release_name)
         helpers.ask(question)
 
-        self._pull_branch("develop")
+        self._pull_branch(self.develop_branch)
 
         commit_sha = integrations.branch_exists(
-            self.github_token, self.github_repository_name, "develop"
+            self.github_token, self.github_repository_name, self.develop_branch
         )
         commit_ref = "refs/heads/{}".format(branch_name)
 
@@ -393,20 +397,20 @@ class Glow(object):
             messages.error("«{}» doesn't exists remotely.".format(branch_name))
             return False
 
-        self._change_branch("main")
-        self._pull_branch("main")
+        self._change_branch(self.main_branch)
+        self._pull_branch(self.main_branch)
 
         self._change_branch(branch_name)
-        self._rebase_branch("develop")
+        self._rebase_branch(self.develop_branch)
         self._push_branch(branch_name, force=True)
 
-        changes = self._get_changes(branch_name, "main")
+        changes = self._get_changes(branch_name, self.main_branch)
 
         status_code, response = integrations.create_pull_request(
             self.github_token,
             self.github_repository_name,
             branch_name,
-            "main",
+            self.main_branch,
             str(release_name),
             changes,
         )
@@ -434,18 +438,19 @@ class Glow(object):
             messages.error("«{}» doesn't exists remotely.".format(branch_name))
             return False
 
-        self._change_branch("main")
-        self._pull_branch("main")
+        self._change_branch(self.main_branch)
+        self._pull_branch(self.main_branch)
 
         self._create_tag(str(release_name))
 
-        self._change_branch("develop")
-        self._pull_branch("develop")
+        self._change_branch(self.develop_branch)
+        self._pull_branch(self.develop_branch)
 
         self.repo.git.merge("--no-ff", branch_name)
         self.repo.git.branch("-D", branch_name)
-        self.repo.git.push("origin", ":{}".format(branch_name))
-        self.repo.git.remote("prune", "origin")
+        self.repo.git.push(self.remote_name, ":{}".format(branch_name))
+        self.repo.git.push(self.remote_name, self.develop_branch)
+        self.repo.git.remote("prune", self.remote_name)
 
         self._push_tags()
 
@@ -458,14 +463,30 @@ class Glow(object):
 
     def start_hotfix(self):
         hotfix_name = self.version.bump_patch()
-        # branch_name = "hotfix/{}".format(hotfix_name)
-        question = "Start hotfix {} [y/n] ".format(hotfix_name)
+        branch_name = "hotfix/{}".format(hotfix_name)
+
+        if self._branch_exists(branch_name):
+            messages.error("«{}» already exists locally.".format(branch_name))
+            return False
+
+        if integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.warning(
+                "«{}» already exists remotely.".format(branch_name)
+            )
+            self._pull_branch(branch_name, create=True)
+            return False
+
+        question = "Start hotfix «{}» [y/n] ".format(hotfix_name)
         helpers.ask(question)
 
+        self._pull_branch(self.main_branch)
+
         commit_sha = integrations.branch_exists(
-            self.github_token, self.github_repository_name, "master"
+            self.github_token, self.github_repository_name, self.main_branch
         )
-        commit_ref = "refs/heads/hotfix/{}".format(hotfix_name)
+        commit_ref = "refs/heads/{}".format(branch_name)
 
         status_code = integrations.create_branch(
             self.github_token,
@@ -475,46 +496,98 @@ class Glow(object):
         )
 
         if status_code == 201:
-            messages.success(
-                "New branch: hotfix/{} created".format(hotfix_name)
-            )
-
-            if self._pull_branch(
-                "hotfix/{}".format(hotfix_name), create_branch=True
-            ):
-                messages.success(
-                    'Switched to a new branch "hotfix/{}".'.format(hotfix_name)
-                )
-                return True
-
-            else:
-                messages.critical(
-                    "Unable to checkout to branch: hotfix/{}".format(
-                        hotfix_name
-                    )
-                )
-                return False
+            messages.success("«{}» created on Github".format(branch_name))
+            self._pull_branch(branch_name, create=True)
+            messages.success("Switch to «{}».".format(branch_name))
+            return True
 
         elif status_code == 422:
-            messages.error(
-                "Feature branch hotfix/{} already exists.".format(hotfix_name)
-            )
-            return False
+            messages.warning("{} already exists on Github.".format(branch_name))
+            self._pull_branch(branch_name, create=True)
+            messages.success("Switch to «{}».".format(branch_name))
+            return True
 
         else:
             messages.critical(
-                "Release branch hotfix/{} can not be created ({}).".format(
-                    hotfix_name,
+                "{} can not be created on Github ({}:).".format(
+                    branch_name,
                     status_code,
                 )
             )
             return False
 
     def review_hotfix(self):
-        ...
+        hotfix_name = self.version.bump_patch()
+        branch_name = "hotfix/{}".format(hotfix_name)
+
+        if not self._branch_exists(branch_name):
+            messages.error("«{}» doesn't exists locally.".format(branch_name))
+            return False
+
+        if not integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("«{}» doesn't exists remotely.".format(branch_name))
+            return False
+
+        self._change_branch(self.main_branch)
+        self._pull_branch(self.main_branch)
+
+        self._change_branch(branch_name)
+        self._rebase_branch(self.main_branch)
+        self._push_branch(branch_name, force=True)
+
+        changes = self._get_changes(branch_name, self.main_branch)
+
+        status_code, response = integrations.create_pull_request(
+            self.github_token,
+            self.github_repository_name,
+            branch_name,
+            self.main_branch,
+            str(hotfix_name),
+            changes,
+        )
+
+        if status_code == 201:
+            messages.success("New PR created: {}".format(response))
+            return True
+
+        else:
+            for error in response:
+                messages.error(error)
+            return False
 
     def finish_hotfix(self):
-        ...
+        hotfix_name = self.version.bump_patch()
+        branch_name = "hotfix/{}".format(hotfix_name)
+
+        if not self._branch_exists(branch_name):
+            messages.error("«{}» doesn't exists locally.".format(branch_name))
+            return False
+
+        if not integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("«{}» doesn't exists remotely.".format(branch_name))
+            return False
+
+        self._change_branch(self.main_branch)
+        self._pull_branch(self.main_branch)
+
+        self._create_tag(str(hotfix_name))
+
+        self._change_branch(self.develop_branch)
+        self._pull_branch(self.develop_branch)
+
+        self.repo.git.merge("--no-ff", branch_name)
+        self.repo.git.branch("-D", branch_name)
+        self.repo.git.push(self.remote_name, ":{}".format(branch_name))
+        self.repo.git.push(self.remote_name, self.develop_branch)
+        self.repo.git.remote("prune", self.remote_name)
+
+        self._push_tags()
+
+        messages.success(":fireworks:  «{}» finished.".format(branch_name))
 
     def cancel_hotfix(self):
         messages.warning("Not implemented yet")
