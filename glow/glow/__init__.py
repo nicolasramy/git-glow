@@ -284,7 +284,31 @@ class Glow(object):
                 messages.critical(error)
             return False
 
-    def cancel_feature(self, issue_id, description=None):
+    def finish_feature(self, issue_id):
+        issue_id = validators.validate_issue_id(issue_id)
+        feature_name = "{}-{}".format(self.jira_project_key, issue_id)
+        branch_name = "feature/{}".format(feature_name)
+
+        if not self._branch_exists(branch_name):
+            messages.error("«{}» doesn't exists locally.".format(branch_name))
+            return False
+
+        if not integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("«{}» doesn't exists remotely.".format(branch_name))
+            return False
+
+        self._change_branch("develop")
+        self._pull_branch("develop")
+
+        self.repo.git.branch("-D", branch_name)
+        self.repo.git.push("origin", ":{}".format(branch_name))
+        self.repo.git.remote("prune", "origin")
+
+        messages.success(":fireworks:  «{}» finished.".format(branch_name))
+
+    def cancel_feature(self, issue_id):
         messages.warning("Not implemented yet")
 
     """ Release methods """
@@ -424,7 +448,8 @@ class Glow(object):
         self.repo.git.remote("prune", "origin")
 
         self._push_tags()
-        messages.success("«{}» finished :fireworks:.".format(branch_name))
+
+        messages.success(":fireworks:  «{}» finished.".format(branch_name))
 
     def cancel_release(self, is_master=False):
         messages.warning("Not implemented yet")
