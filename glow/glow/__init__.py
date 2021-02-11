@@ -14,7 +14,7 @@ class Glow(object):
 
     version = "0.0.0"
 
-    main_branch = "main"
+    main_branch = "master"
     develop_branch = "develop"
     remote_name = "origin"
 
