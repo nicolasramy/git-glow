@@ -62,7 +62,9 @@ def create_branch(github_token, repository_name, commit_ref, commit_sha):
     return response.status_code
 
 
-def create_pull_request(github_token, source_branch, dest_branch, title, body):
+def create_pull_request(
+    github_token, repository_name, source_branch, dest_branch, title, body
+):
     session = Session()
 
     headers = {
@@ -70,14 +72,20 @@ def create_pull_request(github_token, source_branch, dest_branch, title, body):
         "Content-Type": "application/json",
     }
     payload = {
-        "": title,
+        "title": title,
         "body": body,
         "head": source_branch,
         "base": dest_branch,
     }
 
     response = session.post(
-        "{}".format(GITHUB_API_URL), headers=headers, data=json.dumps(payload)
+        "{}/repos/{}/pulls".format(GITHUB_API_URL, repository_name),
+        headers=headers,
+        data=json.dumps(payload),
     )
 
-    return response.status_code
+    if response.status_code == 201:
+        return response.status_code, response.json().get("html_url")
+
+    else:
+        return response.status_code, [_ for _ in response.json.get("errors")]

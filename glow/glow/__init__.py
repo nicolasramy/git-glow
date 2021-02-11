@@ -1,17 +1,13 @@
 import errno
-import json
 import os
 import sys
 
 import colorama
 from git import Repo
 from git.exc import InvalidGitRepositoryError
-import requests
 import semver
 
 from . import helpers, integrations, messages, validators
-
-# from . import helpers, integrations, messages, models, validators
 
 
 class Glow(object):
@@ -25,8 +21,6 @@ class Glow(object):
     working_directory = None
     git_directory = None
 
-    glow_config = None
-
     jira_project_key = None
     github_repository_name = None
     github_token = None
@@ -37,18 +31,19 @@ class Glow(object):
     def _branch_exists(self, branch_name):
         return branch_name in self._branches()
 
-    def _pull_branch(self, branch_name, create_branch=False):
-        if create_branch:
-            self.repo.git.pull("origin", branch_name)
-            self.repo.git.checkout("HEAD", b=branch_name)
-        else:
-            self.repo.git.checkout(branch_name)
-            self.repo.git.pull("origin", branch_name)
+    def _pull_branch(self, branch_name):
+        self.repo.git.checkout(branch_name)
+        self.repo.git.pull("origin", branch_name)
 
         messages.success("↓ «{}» pulled.".format(branch_name))
 
-    def _push_branch(self, branch_name):
-        self.repo.git.push("origin", branch_name)
+    def _push_branch(self, branch_name, force=False):
+        if force:
+            self.repo.git.push("origin", branch_name, "--force")
+
+        else:
+            self.repo.git.push("origin", branch_name)
+
         messages.success("↑ «{}» pushed.".format(branch_name))
 
     def _tags(self):
@@ -61,6 +56,11 @@ class Glow(object):
     def _push_tags(self):
         self.repo.git.push("origin", "--tags")
         messages.success("↑ tags pushed.")
+
+    def _get_changes(self, source_branch, dest_branch):
+        return self.repo.git.log(
+            "{}...{}".format(source_branch, dest_branch), "--pretty=format:%s"
+        )
 
     def _create_config(self):
         self.jira_project_key = messages.question("Jira Project Key? ").upper()
@@ -158,7 +158,7 @@ class Glow(object):
             tags.sort(reverse=True)
             latest = tags[0]
             self.version = semver.VersionInfo.parse(latest)
-            messages.log(" :label: Latest version: {}".format(latest))
+            messages.log(" :label:   Latest version: {}".format(latest))
 
     def __init__(self):
         """Initialize Github Flow CLI"""
@@ -177,13 +177,13 @@ class Glow(object):
         branch_name = "feature/{}".format(feature_name)
 
         if self._branch_exists(feature_name):
-            messages.error("{} already exists locally.".format(branch_name))
+            messages.error("«{}» already exists locally.".format(branch_name))
             return False
 
         if integrations.branch_exists(
             self.github_token, self.github_repository_name, branch_name
         ):
-            messages.error("{} already exists remotely.".format(branch_name))
+            messages.error("«{}» already exists remotely.".format(branch_name))
             self._pull_branch(branch_name)
             return False
 
@@ -203,102 +203,66 @@ class Glow(object):
         )
 
         if status_code == 201:
-            messages.success("New branch: {} created".format(branch_name))
-            self._pull_branch(branch_name, create_branch=True)
-            messages.success(
-                "Switched to a new branch «{}».".format(branch_name)
-            )
+            messages.success("«{}» created on Github".format(branch_name))
+            self._pull_branch(branch_name)
+            messages.success("Switch to «{}».".format(branch_name))
             return True
 
         elif status_code == 422:
-            messages.warning(
-                "Feature branch feature/{} already exists.".format(feature_name)
-            )
-            self._pull_branch(
-                "feature/{}".format(feature_name), create_branch=True
-            )
-            messages.success(
-                'Switched to a new branch "feature/{}".'.format(feature_name)
-            )
+            messages.warning("{} already exists on Github.".format(branch_name))
+            self._pull_branch(branch_name)
+            messages.success("Switch to «{}».".format(branch_name))
             return True
 
         else:
             messages.critical(
-                "Feature branch feature/{} can not be created ({}:).".format(
-                    feature_name,
+                "{} can not be created on Github ({}:).".format(
+                    branch_name,
                     status_code,
                 )
             )
             return False
 
     def review_feature(self, issue_id):
-        try:
-            issue_id = int(issue_id)
+        issue_id = validators.validate_issue_id(issue_id)
+        feature_name = "{}-{}".format(self.jira_project_key, issue_id)
+        branch_name = "feature/{}".format(feature_name)
 
-        except ValueError:
-            messages.critical('IssueID "{}" is not valid.'.format(issue_id))
-            sys.exit(1)
+        if not self._branch_exists(branch_name):
+            messages.error("«{}» doesn't exists locally.".format(branch_name))
+            return False
 
-        except TypeError:
-            messages.critical("IssueID is not set.")
-            sys.exit(1)
+        if not integrations.branch_exists(
+            self.github_token, self.github_repository_name, branch_name
+        ):
+            messages.error("«{}» doesn't exists remotely.".format(branch_name))
+            return False
 
-        if not self._feature_exists(issue_id):
-            messages.error(
-                "There is no feature for IssueID {}.".format(issue_id)
-            )
-            sys.exit(1)
-
-        feature_name = "feature/{}-{}".format(self.jira_project_key, issue_id)
-
-        # Push feature branch to origin
-        messages.log("Push feature branch «{}» to origin".format(feature_name))
-        self._push_branch(feature_name)
-
-        # Pull last modifications from develop
-        messages.log("Pull last modifications from develop")
+        self.repo.git.checkout("develop")
         self._pull_branch("develop")
 
-        # Create a Pull Request for this feature branch into develop
-        messages.log(
-            "Create a Pull Request for this feature branch into develop"
-        )
-        session = requests.Session()
+        self.repo.git.checkout(branch_name)
+        self.repo.git.rebase("develop")
+        self._push_branch(branch_name, force=True)
 
-        headers = {
-            "Authorization": "token {}".format(self.github_token),
-            "Content-Type": "application/json",
-        }
+        changes = self._get_changes(branch_name, "develop")
 
-        title = feature_name.replace("feature/", "")
-        payload = {
-            "title": title,
-            "body": title,
-            "head": feature_name,
-            "base": "develop",
-        }
-
-        response = session.post(
-            "{}/repos/{}/pulls".format(
-                self.GITHUB_API_URL,
-                self.github_repository_name,
-            ),
-            headers=headers,
-            data=json.dumps(payload),
+        status_code, response = integrations.create_pull_request(
+            self.github_token,
+            self.github_repository_name,
+            branch_name,
+            "develop",
+            feature_name,
+            changes,
         )
 
-        if response.status_code == 201:
-            messages.success(
-                "New Pull Request created: {}".format(
-                    response.json()["html_url"]
-                )
-            )
+        if status_code == 201:
+            messages.success("New PR created: {}".format(response))
             return True
 
         else:
-            messages.critical(response.json()["message"])
-            for error in response.json()["errors"]:
-                messages.error(error["message"])
+            for error in response:
+                messages.critical(error)
             return False
 
     def cancel_feature(self, issue_id, description=None):

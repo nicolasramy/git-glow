@@ -26,6 +26,9 @@ More information about [gitflow](http://nvie.com/posts/a-successful-git-branchin
     - [x] feature
     - [x] release
     - [x] hotfix
+- [ ] Create an `init` command
+- [ ] Update behavior if develop branch doesn't exists 
+
   
 
 ## How to setup
