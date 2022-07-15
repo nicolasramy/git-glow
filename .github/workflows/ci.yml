@@ -34,7 +34,7 @@ jobs:
         run: |
           docker run \
           --rm \
-          -v "$PWD/app:/app" \
+          -v "$PWD:/app" \
           ghcr.io/connecting-food/python-quality-assurance:master \
           black . -tpy37 -l80
 
