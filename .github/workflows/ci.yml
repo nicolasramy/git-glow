@@ -69,7 +69,7 @@ jobs:
         run: |
           docker run \
           --rm \
-          -v "$PWD"/app/Dockerfile:/dockerfilelinter/Dockerfile \
+          -v "$PWD"/Dockerfile:/dockerfilelinter/Dockerfile \
           petitnuage/dockerfile-linter:latest \
           linter \
           -i EC0001,EF0004,ER0001,ER0007,ER0012,ER0013,EU0001 \
