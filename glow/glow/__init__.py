@@ -62,7 +62,16 @@ class Glow(object):
         messages.info("↑ «{}» pushed.".format(branch_name))
 
     def _tags(self):
-        return [tag.name for tag in self.repo.tags]
+        versions = []
+        for tag in self.repo.tags:
+            try:
+                versions.append((tag.object.committed_date, tag.name,))
+
+            except AttributeError:
+                pass
+
+        versions.sort(key=lambda _tag: _tag[0])
+        return [tag_name for tag_date, tag_name in versions]
 
     def _create_tag(self, version, ref=None):
         if ref:
