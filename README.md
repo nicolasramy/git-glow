@@ -31,13 +31,13 @@ Following messages will be prompted, waiting an answer for each step:
 
 ```shell
 Create a glow config? [Y/n] y
-Jira Project Key? GitGlow
+Jira Project Key? GLOW
 Github Repository Name? [:owner/:name] nicolasramy/git-glow
-Github Token? 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
-Start feature name: «feature/NG-1» [y/n] y
+Github Token? ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Start feature name: «feature/GLOW-1234» [y/n] y
 ```
 
-- Jira Project Key is a key that you chosed when you created your Jira project and you can retrieve as prefix of your Jira tickets (like GitGlow-1)
+- Jira Project Key is a key that you chosed when you created your Jira project and you can retrieve as prefix of your Jira tickets (like GLOW-1234)
 - Github Repository Name is same as described in the prompted message: `the_repository_owner/the_project_name`
 - Github token is an access token you can set from your GitHub settings: https://github.com/settings/tokens.
   This token will require "Full control of private repositories" (`repo` checkbox when you create it).
@@ -47,9 +47,9 @@ If the configuration successfully registered and you think it was wrong, you can
 
 ```
 [glow]
-        github-token = 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
+        github-token = ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         github-repository-name = nicolasramy/git-glow
-        jira-project-key = GitGlow
+        jira-project-key = GLOW
 ```
 
 ## Usage
