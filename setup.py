@@ -11,7 +11,7 @@ setup(
         "A new git extension to use git flow "
         "branching model automatically with Jira and Github"
     ),
-    long_description=open("README.md").read(),
+    long_description=open("DESCRIPTION.rst").read(),
     entry_points={
         "console_scripts": ["git-glow=glow.__main__:main"],
     },
