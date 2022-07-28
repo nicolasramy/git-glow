@@ -1,4 +1,4 @@
-name: CI
+name: Continuous Integration
 
 on:
   pull_request:
@@ -6,25 +6,44 @@ on:
       - master
       - develop
 
-  workflow_dispatch:
-
 jobs:
-  black:
-    runs-on: ubuntu-latest
+  codebase:
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Black 3.8
-        uses: lgeiger/black-action@v1.0.1
+        uses: actions/checkout@v3
         with:
-          args: "glow -tpy38 -l80 --check"
+          fetch-depth: 0
+
+      - name: Attempt a rebase
+        run: |
+          git config --global advice.detachedHead "false"
+          git checkout -b ${{ github.base_ref }}
+          git branch -u origin/${{ github.base_ref }}
+          git checkout ${{ github.event.pull_request.head.ref }}
+          git rebase ${{ github.base_ref }}
+
+  black:
+    needs: codebase
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Black 3.7
+        run: |
+          docker run \
+          --rm \
+          -v "$PWD:/app" \
+          ghcr.io/connecting-food/python-quality-assurance:master \
+          black . -tpy37 -l80
 
   flake8:
-    runs-on: ubuntu-latest
+    needs: codebase
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v2
@@ -36,4 +55,22 @@ jobs:
           pip install flake8 && \
           flake8 --select=C,E,F,W \
             --max-line-length 80 \
-            --max-complexity 10
+            --max-complexity 15 \
+            --ignore=W503
+
+  lint-dockerfile:
+    needs: [black, flake8]
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Lint Dockerfile
+        run: |
+          docker run \
+          --rm \
+          -v "$PWD"/Dockerfile:/dockerfilelinter/Dockerfile \
+          petitnuage/dockerfile-linter:latest \
+          linter \
+          -i EC0001,EF0004,ER0001,ER0007,ER0012,ER0013,EU0001 \
+          -f Dockerfile
