@@ -21,7 +21,7 @@ pip install git-glow
 ### Configuration
 
 Configuration begins during the first command.
-For example, just request to start a new feature (according you already have a Jira project, with a "GitGlow" key and a "GitGlow-1" ticket, otherwize a 404 error will be prompted at the end of this operation):
+For example, just request to start a new feature (according you already have a Jira project, with a "GLOW" key and a "GLOW-1" ticket, otherwize a 404 error will be prompted at the end of this operation):
 
 ```shell
 git glow start feature 1
