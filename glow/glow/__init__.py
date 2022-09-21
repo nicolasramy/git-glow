@@ -185,8 +185,7 @@ class Glow(object):
             )
 
         else:
-            tags.sort(reverse=True)
-            latest = tags[0]
+            latest = tags[-1]
             self.version = semver.VersionInfo.parse(latest)
             messages.log(":label:  Latest version: {}".format(latest))
 
