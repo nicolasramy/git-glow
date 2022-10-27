@@ -25,7 +25,7 @@ setup(
         "requests==2.25.1",
         "semver==2.13.0",
         "termcolor==1.1.0",
-        "urllib3[secure]==1.26.3",
+        "urllib3[secure]==1.26.5",
     ],
     url="https://github.com/nicolasramy/git-glow",
     classifiers=[
