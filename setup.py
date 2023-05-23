@@ -22,7 +22,7 @@ setup(
         "gitpython==3.1.12",
         "idna==2.10",
         "python-slugify==4.0.1",
-        "requests==2.25.1",
+        "requests==2.31.0",
         "semver==2.13.0",
         "termcolor==1.1.0",
         "urllib3[secure]==1.26.5",
