@@ -19,7 +19,7 @@ setup(
         "colorama==0.4.4",
         "click==8.1.3",
         "emoji==1.2.0",
-        "gitpython==3.1.12",
+        "gitpython==3.1.32",
         "idna==2.10",
         "python-slugify==4.0.1",
         "requests==2.31.0",
