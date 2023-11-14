@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="git-glow",
-    version="0.2.10",
+    version="0.2.11",
     packages=find_packages(),
     author="Nicolas RAMY",
     author_email="nicolas.ramy@darkelda.com",
