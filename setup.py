@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="git-glow",
-    version="0.2.11",
+    version="0.2.12",
     packages=find_packages(),
     author="Nicolas RAMY",
     author_email="nicolas.ramy@darkelda.com",
@@ -19,13 +19,13 @@ setup(
         "colorama==0.4.4",
         "click==8.1.3",
         "emoji==1.2.0",
-        "gitpython==3.1.32",
+        "gitpython==3.1.37",
         "idna==2.10",
         "python-slugify==4.0.1",
         "requests==2.31.0",
         "semver==2.13.0",
         "termcolor==1.1.0",
-        "urllib3[secure]==1.26.5",
+        "urllib3[secure]==1.26.18",
     ],
     url="https://github.com/nicolasramy/git-glow",
     classifiers=[
